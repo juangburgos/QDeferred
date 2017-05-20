@@ -4,7 +4,7 @@
 #include <QList>
 #include <functional>
 
-template<class T>
+template<class ...Types>
 class QDeferredData
 {
 	
@@ -12,9 +12,9 @@ public:
 	// consumer API
 
 	// done method	
-	void done(std::function<void(T)> callback);
+	void done(std::function<void(Types (&...args))> callback); // by copy would be <Types... arg>
 	// fail method
-	void fail(std::function<void(T)> callback);
+	void fail(std::function<void(Types(&...args))> callback);
 	//// when method
 	//template <typename T>
 	//static QDeferredData when(QList<QDeferredData> listDeferred);
@@ -22,57 +22,71 @@ public:
 	// provider API
 
 	// resolve method
-	void resolve(T &cargs);
+	void resolve(Types(&...args));
 	// reject method
-	void reject(T &cargs);
+	void reject(Types(&...args));
 
 private:
 	// members
-	QList< std::function<void(T)> > m_doneList;
-	QList< std::function<void(T)> > m_failList;
+	QList< std::function<void(Types(&...args))> > m_doneList;
+	QList< std::function<void(Types(&...args))> > m_failList;
 	// methods
-	void execute(QList< std::function<void(T)> > &listCallbacks, T &cargs);
+	void execute(QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args));
 
 };
 
-template<class T>
-void QDeferredData<T>::done(std::function<void(T)> callback)
+template<class ...Types>
+void QDeferredData<Types...>::done(std::function<void(Types(&...args))> callback)
 {
 	// append to fail callbacks list
 	m_doneList.append(callback);
 }
 
-template<class T>
-void QDeferredData<T>::fail(std::function<void(T)> callback)
+template<class ...Types>
+void QDeferredData<Types...>::fail(std::function<void(Types(&...args))> callback)
 {
 	// append to done callbacks list
 	m_failList.append(callback);
 }
 
-template<class T>
-void QDeferredData<T>::resolve(T &cargs)
+template<class ...Types>
+void QDeferredData<Types...>::resolve(Types(&...args))
 {
 	// execute all done callbacks
-	this->execute(this->m_doneList, cargs);
+	this->execute(this->m_doneList, args...);
 }
 
-template<class T>
-void QDeferredData<T>::reject(T &cargs)
+template<class ...Types>
+void QDeferredData<Types...>::reject(Types(&...args))
 {
 	// execute all fail callbacks
-	this->execute(this->m_failList, cargs);
+	this->execute(this->m_failList, args...);
 }
 
-template<class T>
-void QDeferredData<T>::execute(QList< std::function<void(T)> > &listCallbacks, T &cargs)
+template<class ...Types>
+void QDeferredData<Types...>::execute(QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args))
 {
 	// loop all callbacks
 	for (int i = 0; i < listCallbacks.length(); i++)
 	{
 		// call each callback with arguments
-		listCallbacks.at(i)(cargs);
+		listCallbacks.at(i)(args...);
 	}
 }
+
+
+/*
+
+
+
+template<class T>
+void QDeferredData<T>::execute(QList< std::function<void(T)> > &listCallbacks, T &cargs)
+{
+
+}
+
+*/
+
 
 // ---------------------------------------------
 //	// create deferred and resolve/fail it when all input deferreds have resolved/failed

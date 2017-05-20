@@ -11,9 +11,10 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-	QDeferredData<QList<QVariant>> deferred1;
-	QDeferredData<QList<QVariant>> deferred2;
-	QDeferredData<QList<QVariant>> deferred3;
+	QDeferredData<QList<QVariant>>          deferred1;
+	QDeferredData<QList<QVariant>, QString> deferred2;
+	QDeferredData<int, double>              deferred3;
+	QDeferredData<>                         deferred4;
 
 	// setup deferred 1
 	deferred1.done([=](QList<QVariant> listArgs) {
@@ -29,29 +30,36 @@ int main(int argc, char *argv[])
 	});
 
 	// setup deferred 2
-	deferred2.fail([=](QList<QVariant> listArgs) {
+	deferred2.fail([=](QList<QVariant> listArgs, QString strMessage) {
 		// print args
 		for (int i = 0; i < listArgs.length(); i++)
 		{
 			qDebug() << "[DEF2] Argument " << i << " = " << listArgs.at(i) << ".";
 		}
+		qDebug() << "[DEF2] Message " << strMessage << ".";
 	});
-	deferred2.fail([=](QList<QVariant> listArgs) {
+	deferred2.fail([=](QList<QVariant> listArgs, QString strMessage) {
 		// print finished
 		qDebug() << "[DEF2] Failed.";
 	});
 
 	// setup deferred 3
-	deferred3.done([=](QList<QVariant> listArgs) {
+	deferred3.done([=](int i, double d) {
 		// print args
-		for (int i = 0; i < listArgs.length(); i++)
-		{
-			qDebug() << "[DEF3] Argument " << i << " = " << listArgs.at(i) << ".";
-		}
+		qDebug() << "[DEF3] Argument i = " << i << ".";
+		qDebug() << "[DEF3] Argument d = " << d << ".";
 	});
-	deferred3.done([=](QList<QVariant> listArgs) {
+	deferred3.done([=](int i, double d) {
+		Q_UNUSED(i)
+		Q_UNUSED(d)
 		// print finished
 		qDebug() << "[DEF3] Resolved.";
+	});
+
+	// setup deferred 4
+	deferred4.done([=]() {
+		// print finished
+		qDebug() << "[DEF4] Resolved.";
 	});
 
 	////// setup when : TODO : fails because we need to pass by referrence, 
@@ -82,17 +90,22 @@ int main(int argc, char *argv[])
 		listArgs.append("Mundo");
 		listArgs.append(6789);
 		// reject
-		deferred2.reject(listArgs);
+		QString strMessage("Que dices?");
+		deferred2.reject(listArgs, strMessage);
 	});
 
 	// asynch resolve of deferred 3
 	QTimer::singleShot(4000, [&]() {
-		QList<QVariant> listArgs;
-		listArgs.append("Bonjour");
-		listArgs.append("Le monde");
-		listArgs.append(-13);
 		// resolve
-		deferred3.resolve(listArgs);
+		int    iNum = 666;
+		double dNum = 666.666;
+		deferred3.resolve(iNum, dNum);
+	});
+
+	// asynch resolve of deferred 4
+	QTimer::singleShot(5000, [&]() {
+		// resolve
+		deferred4.resolve();
 	});
 
     return a.exec();
