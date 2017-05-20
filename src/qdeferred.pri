@@ -1,6 +1,5 @@
+CONFIG += c++11
 
 INCLUDEPATH += $$PWD/
 
-SOURCES  += $$PWD/qdeferred.cpp       \
-
-HEADERS  += $$PWD/qdeferred.h         \
+HEADERS  += $$PWD/qdeferreddata.hpp  \
