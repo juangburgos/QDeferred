@@ -2,4 +2,5 @@ CONFIG += c++11
 
 INCLUDEPATH += $$PWD/
 
-HEADERS  += $$PWD/qdeferreddata.hpp  \
+HEADERS  += $$PWD/qdeferred.hpp      \
+            $$PWD/qdeferreddata.hpp  \

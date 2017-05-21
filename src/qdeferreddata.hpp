@@ -1,23 +1,25 @@
-#ifndef QDEFERRED_H
-#define QDEFERRED_H
+#ifndef QDEFERREDDATA_H
+#define QDEFERREDDATA_H
 
+#include <QSharedData>
 #include <QList>
 #include <functional>
 
 template<class ...Types>
-class QDeferredData
+class QDeferredData : public QSharedData
 {
 	
 public:
+	// constructors
+	QDeferredData();
+	QDeferredData(const QDeferredData &other);
+
 	// consumer API
 
 	// done method	
 	void done(std::function<void(Types (&...args))> callback); // by copy would be <Types... arg>
 	// fail method
 	void fail(std::function<void(Types(&...args))> callback);
-	//// when method
-	//template <typename T>
-	//static QDeferredData when(QList<QDeferredData> listDeferred);
 
 	// provider API
 
@@ -34,6 +36,20 @@ private:
 	void execute(QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args));
 
 };
+
+template<class ...Types>
+QDeferredData<Types...>::QDeferredData()
+{
+
+}
+
+template<class ...Types>
+QDeferredData<Types...>::QDeferredData(const QDeferredData &other) : QSharedData(other),
+m_doneList(other.m_doneList),
+m_failList(other.m_failList)
+{
+	// nothing to do here
+}
 
 template<class ...Types>
 void QDeferredData<Types...>::done(std::function<void(Types(&...args))> callback)
@@ -74,37 +90,4 @@ void QDeferredData<Types...>::execute(QList< std::function<void(Types(&...args))
 	}
 }
 
-
-/*
-
-
-
-template<class T>
-void QDeferredData<T>::execute(QList< std::function<void(T)> > &listCallbacks, T &cargs)
-{
-
-}
-
-*/
-
-
-// ---------------------------------------------
-//	// create deferred and resolve/fail it when all input deferreds have resolved/failed
-//	QDeferredData retDeferred;
-//	int iResolveCount = 0;
-//	// loop all input deferreds
-//	for (int i = 0; i < listDeferred.length(); i++)
-//	{
-//		listDeferred[i].done([&](T args) {
-//			iResolveCount++;
-//			// test if all resolved
-//			if (iResolveCount == listDeferred.length())
-//			{
-//				retDeferred.resolve();
-//			}
-//		});
-//	}
-//	// return
-//	return retDeferred;
-
-#endif // QDEFERRED_H
+#endif // QDEFERREDDATA_H

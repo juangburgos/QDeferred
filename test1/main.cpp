@@ -5,16 +5,27 @@
 #include <QList>
 #include <QVariant>
 
-#include <qdeferreddata.hpp>
+#include <QDeferred>
+
+void testShared(QDeferred<int, double> def) {
+	qDebug() << "[INFO] Called testShared ";
+	// setup deferred 3
+	def.done([=](int i, double d) {
+		// print args
+		qDebug() << "[DEF3] testShared i = " << i << ".";
+		qDebug() << "[DEF3] testShared d = " << d << ".";
+	});
+}
 
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-	QDeferredData<QList<QVariant>>          deferred1;
-	QDeferredData<QList<QVariant>, QString> deferred2;
-	QDeferredData<int, double>              deferred3;
-	QDeferredData<>                         deferred4;
+	QDeferred<QList<QVariant>>          deferred1;
+	QDeferred<QList<QVariant>, QString> deferred2;
+	QDeferred<int, double>              deferred3;
+	//QDeferred<>                         deferred4;
+	//QDeferred<>                         deferred5;
 
 	// setup deferred 1
 	deferred1.done([=](QList<QVariant> listArgs) {
@@ -56,22 +67,24 @@ int main(int argc, char *argv[])
 		qDebug() << "[DEF3] Resolved.";
 	});
 
-	// setup deferred 4
-	deferred4.done([=]() {
-		// print finished
-		qDebug() << "[DEF4] Resolved.";
-	});
+	testShared(deferred3);
 
-	////// setup when : TODO : fails because we need to pass by referrence, 
-	//////                     better implement as QExplicitlySharedDataPointer for this to work
-	//////                     checkout QJsNode and QJsNodeData implementation
-	////QList<QDeferredData> listDeferred;
-	////listDeferred.append(deferred1);
-	////listDeferred.append(deferred3);
-	////QDeferredData::when(listDeferred).done([=](QList<QVariant> listArgs) {
-	////	// print finished
-	////	qDebug() << "[INFO] Deferred 1 and 3 Resolved.";
-	////});
+	//// setup deferred 4
+	//deferred4.done([=]() {
+	//	// print finished
+	//	qDebug() << "[DEF4] Resolved.";
+	//});
+
+	//// setup when : TODO : fails because we need to pass by referrence, 
+	////                     better implement as QExplicitlySharedDataPointer for this to work
+	////                     checkout QJsNode and QJsNodeData implementation
+	//QList<QDeferred<>> listDeferred;
+	//listDeferred.append(deferred4);
+	//listDeferred.append(deferred5);
+	//when(listDeferred).done([=]() {
+	//	// print finished
+	//	qDebug() << "[INFO] Deferred 4 and 5 Resolved.";
+	//});
 
 	// asynch resolve of deferred 1
 	QTimer::singleShot(2000, [&]() {
@@ -102,11 +115,17 @@ int main(int argc, char *argv[])
 		deferred3.resolve(iNum, dNum);
 	});
 
-	// asynch resolve of deferred 4
-	QTimer::singleShot(5000, [&]() {
-		// resolve
-		deferred4.resolve();
-	});
+	//// asynch resolve of deferred 4
+	//QTimer::singleShot(1000, [&]() {
+	//	// resolve
+	//	deferred4.resolve();
+	//});
+
+	//// asynch resolve of deferred 5
+	//QTimer::singleShot(1500, [&]() {
+	//	// resolve
+	//	deferred5.resolve();
+	//});
 
     return a.exec();
 }
