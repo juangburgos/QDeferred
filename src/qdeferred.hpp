@@ -19,12 +19,17 @@ public:
 	QDeferred &operator=(const QDeferred<Types...> &);
 	~QDeferred();
 
-	// wrapper consumer API
+	// wrapper consumer API (with chaning)
+
+	// get state method
+	QDeferredState state();
 
 	// done method	
-	void done(std::function<void(Types (&...args))> callback); // by copy would be <Types... arg>
+	QDeferred<Types...> done(std::function<void(Types (&...args))> callback); // by copy would be <Types... arg>
 	// fail method
-	void fail(std::function<void(Types(&...args))> callback);
+	QDeferred<Types...> fail(std::function<void(Types(&...args))> callback);
+	// then method
+	QDeferred<Types...> then(std::function<void(Types(&...args))> callback);
 
 	// wrapper provider API
 
@@ -68,15 +73,30 @@ QDeferred<Types...>::~QDeferred()
 }
 
 template<class ...Types>
-void QDeferred<Types...>::done(std::function<void(Types(&...args))> callback)
+QDeferredState QDeferred<Types...>::state()
 {
-	data->done(callback);
+	return data->state();
 }
 
 template<class ...Types>
-void QDeferred<Types...>::fail(std::function<void(Types(&...args))> callback)
+QDeferred<Types...> QDeferred<Types...>::done(std::function<void(Types(&...args))> callback)
+{
+	data->done(callback);
+	return *this;
+}
+
+template<class ...Types>
+QDeferred<Types...> QDeferred<Types...>::fail(std::function<void(Types(&...args))> callback)
 {
 	data->fail(callback);
+	return *this;
+}
+
+template<class ...Types>
+QDeferred<Types...> QDeferred<Types...>::then(std::function<void(Types(&...args))> callback)
+{
+	data->then(callback);
+	return *this;
 }
 
 template<class ...Types>

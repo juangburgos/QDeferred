@@ -5,6 +5,13 @@
 #include <QList>
 #include <functional>
 
+enum QDeferredState
+{
+	PENDING,
+	RESOLVED,
+	REJECTED
+};
+
 template<class ...Types>
 class QDeferredData : public QSharedData
 {
@@ -16,10 +23,15 @@ public:
 
 	// consumer API
 
+	// get state method
+	QDeferredState state();
+
 	// done method	
 	void done(std::function<void(Types (&...args))> callback); // by copy would be <Types... arg>
 	// fail method
 	void fail(std::function<void(Types(&...args))> callback);
+	// then method
+	void then(std::function<void(Types(&...args))> callback);
 
 	// provider API
 
@@ -32,15 +44,19 @@ private:
 	// members
 	QList< std::function<void(Types(&...args))> > m_doneList;
 	QList< std::function<void(Types(&...args))> > m_failList;
+	QList< std::function<void(Types(&...args))> > m_thenList;
+	QDeferredState m_state;
+	std::function<void(std::function<void(Types(&...args))>)> m_finishedFunction;
 	// methods
 	void execute(QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args));
 
 };
 
+
 template<class ...Types>
 QDeferredData<Types...>::QDeferredData()
 {
-
+	m_state = QDeferredState::PENDING;
 }
 
 template<class ...Types>
@@ -52,31 +68,75 @@ m_failList(other.m_failList)
 }
 
 template<class ...Types>
+QDeferredState QDeferredData<Types...>::state()
+{
+	return m_state;
+}
+
+template<class ...Types>
 void QDeferredData<Types...>::done(std::function<void(Types(&...args))> callback)
 {
-	// append to fail callbacks list
+	// append to done callbacks list
 	m_doneList.append(callback);
+	// call it inmediatly if already resolved
+	if (m_state == QDeferredState::RESOLVED)
+	{
+		m_finishedFunction(callback);
+	}
 }
 
 template<class ...Types>
 void QDeferredData<Types...>::fail(std::function<void(Types(&...args))> callback)
 {
-	// append to done callbacks list
+	// append to fail callbacks list
 	m_failList.append(callback);
+	// call it inmediatly if already rejected
+	if (m_state == QDeferredState::REJECTED)
+	{
+		m_finishedFunction(callback);
+	}
+}
+
+template<class ...Types>
+void QDeferredData<Types...>::then(std::function<void(Types(&...args))> callback)
+{
+	// append to then callbacks list
+	m_thenList.append(callback);
+	// call it inmediatly if already resolved or rejected
+	if (m_state == QDeferredState::RESOLVED || m_state == QDeferredState::REJECTED)
+	{
+		m_finishedFunction(callback);
+	}
 }
 
 template<class ...Types>
 void QDeferredData<Types...>::resolve(Types(&...args))
 {
+	// change state
+	m_state = QDeferredState::RESOLVED;
+	// set finished function
+	m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
+		callback(args...);
+	};
 	// execute all done callbacks
 	this->execute(this->m_doneList, args...);
+	// execute all then callbacks
+	this->execute(this->m_thenList, args...);
 }
 
 template<class ...Types>
 void QDeferredData<Types...>::reject(Types(&...args))
 {
+	// change state
+	m_state = QDeferredState::REJECTED;
+	// set finished function
+	m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
+		callback(args...);
+	};
 	// execute all fail callbacks
 	this->execute(this->m_failList, args...);
+	// execute all then callbacks
+	this->execute(this->m_thenList, args...);
 }
 
 template<class ...Types>
