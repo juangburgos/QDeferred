@@ -7,6 +7,17 @@
 
 #include <QDeferred>
 
+/*
+LAMBDA CAPTURE
+http://www.cprogramming.com/c++11/c++11-lambda-closures.html
+[]	        Capture nothing (or, a scorched earth strategy?)
+[&]	        Capture any referenced variable by reference
+[=]	        Capture any referenced variable by making a copy
+[=, &foo]	Capture any referenced variable by making a copy, but capture variable foo by reference
+[bar]	    Capture bar by making a copy; don't copy anything else
+[this]	    Capture the this pointer of the enclosing class
+*/
+
 void testShared(QDeferred<int, double> def) {
 	qDebug() << "[INFO] Called testShared ";
 	// setup deferred 3
@@ -17,6 +28,34 @@ void testShared(QDeferred<int, double> def) {
 	});
 }
 
+// extra API
+// when method
+QDeferred<> when(QList<QDeferred<>> listDeferred)
+{
+	qDebug() << "QDeferred<>::when called";
+	// create deferred and resolve/fail it when all input deferreds have resolved/failed
+	QDeferred<> retDeferred;
+	// loop all input deferreds
+	for (int i = 0; i < listDeferred.length(); i++)
+	{
+		qDebug() << "Loop " << i;
+		// NOTE : Requires mutable because by default a function object should produce the same result every time it's called
+		// http://stackoverflow.com/questions/5501959/why-does-c0xs-lambda-require-mutable-keyword-for-capture-by-value-by-defau
+		listDeferred[i].done([listDeferred, retDeferred]() mutable {
+			static int iResolveCount = 0;
+			iResolveCount++;
+			// test if all resolved
+			if (iResolveCount == listDeferred.length())
+			{
+				// NOTE : resolve with args of last to resolve
+				retDeferred.resolve();
+			}
+		});
+	}
+	// return
+	return retDeferred;
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
@@ -24,8 +63,8 @@ int main(int argc, char *argv[])
 	QDeferred<QList<QVariant>>          deferred1;
 	QDeferred<QList<QVariant>, QString> deferred2;
 	QDeferred<int, double>              deferred3;
-	//QDeferred<>                         deferred4;
-	//QDeferred<>                         deferred5;
+	QDeferred<>                         deferred4;
+	QDeferred<>                         deferred5;
 
 	// setup deferred 1
 	deferred1.done([=](QList<QVariant> listArgs) {
@@ -69,22 +108,20 @@ int main(int argc, char *argv[])
 
 	testShared(deferred3);
 
-	//// setup deferred 4
-	//deferred4.done([=]() {
-	//	// print finished
-	//	qDebug() << "[DEF4] Resolved.";
-	//});
+	// setup deferred 4
+	deferred4.done([=]() {
+		// print finished
+		qDebug() << "[DEF4] Resolved.";
+	});
 
-	//// setup when : TODO : fails because we need to pass by referrence, 
-	////                     better implement as QExplicitlySharedDataPointer for this to work
-	////                     checkout QJsNode and QJsNodeData implementation
-	//QList<QDeferred<>> listDeferred;
-	//listDeferred.append(deferred4);
-	//listDeferred.append(deferred5);
-	//when(listDeferred).done([=]() {
-	//	// print finished
-	//	qDebug() << "[INFO] Deferred 4 and 5 Resolved.";
-	//});
+	// setup WHEN test
+	QList<QDeferred<>> listDeferred;
+	listDeferred.append(deferred4);
+	listDeferred.append(deferred5);
+	when(listDeferred).done([]() {
+		// print finished
+		qDebug() << "[INFO] Deferred 4 and 5 Resolved.";
+	});
 
 	// asynch resolve of deferred 1
 	QTimer::singleShot(2000, [&]() {
@@ -115,17 +152,17 @@ int main(int argc, char *argv[])
 		deferred3.resolve(iNum, dNum);
 	});
 
-	//// asynch resolve of deferred 4
-	//QTimer::singleShot(1000, [&]() {
-	//	// resolve
-	//	deferred4.resolve();
-	//});
+	// asynch resolve of deferred 4
+	QTimer::singleShot(1000, [&]() {
+		// resolve
+		deferred4.resolve();
+	});
 
-	//// asynch resolve of deferred 5
-	//QTimer::singleShot(1500, [&]() {
-	//	// resolve
-	//	deferred5.resolve();
-	//});
+	// asynch resolve of deferred 5
+	QTimer::singleShot(1500, [&]() {
+		// resolve
+		deferred5.resolve();
+	});
 
     return a.exec();
 }

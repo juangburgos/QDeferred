@@ -91,32 +91,5 @@ void QDeferred<Types...>::reject(Types(&...args))
 	data->reject(args...);
 }
 
-//// extra API
-//// when method
-//QDeferred<> when(QList<QDeferred<>> listDeferred)
-//{
-//	qDebug() << "QDeferred<>::when called";
-//	// create deferred and resolve/fail it when all input deferreds have resolved/failed
-//	QList<QDeferred<>> listDeferredCopy = listDeferred;
-//	QDeferred<> retDeferred;
-//	int iResolveCount = 0;
-//	// loop all input deferreds
-//	for (int i = 0; i < listDeferredCopy.length(); i++)
-//	{
-//		qDebug() << "Loop " << i;
-//		listDeferredCopy[i].done([&]() {
-//			iResolveCount++;
-//			// test if all resolved
-//			if (iResolveCount == listDeferredCopy.length())
-//			{
-//				// NOTE : resolve with args of last to resolve
-//				retDeferred.resolve();
-//			}
-//		});
-//	}
-//	// return
-//	return retDeferred;
-//}
-
 
 #endif // QDEFERRED_H
