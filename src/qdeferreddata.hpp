@@ -40,18 +40,21 @@ public:
 	// reject method
 	void reject(Types(&...args));
 
+	// internal API
+	void zerop(std::function<void()> callback);
+
 private:
 	// members
 	QList< std::function<void(Types(&...args))> > m_doneList;
 	QList< std::function<void(Types(&...args))> > m_failList;
 	QList< std::function<void(Types(&...args))> > m_thenList;
+	QList< std::function<void()> > m_zeropList;
 	QDeferredState m_state;
 	std::function<void(std::function<void(Types(&...args))>)> m_finishedFunction;
 	// methods
 	void execute(QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args));
 
 };
-
 
 template<class ...Types>
 QDeferredData<Types...>::QDeferredData()
@@ -122,6 +125,12 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 	this->execute(this->m_doneList, args...);
 	// execute all then callbacks
 	this->execute(this->m_thenList, args...);
+	// loop all zerop callbacks
+	for (int i = 0; i < m_zeropList.length(); i++)
+	{
+		// call each callback with arguments
+		m_zeropList.at(i)();
+	}
 }
 
 template<class ...Types>
@@ -137,6 +146,12 @@ void QDeferredData<Types...>::reject(Types(&...args))
 	this->execute(this->m_failList, args...);
 	// execute all then callbacks
 	this->execute(this->m_thenList, args...);
+	// loop all zerop callbacks
+	for (int i = 0; i < m_zeropList.length(); i++)
+	{
+		// call each callback with arguments
+		m_zeropList.at(i)();
+	}
 }
 
 template<class ...Types>
@@ -147,6 +162,18 @@ void QDeferredData<Types...>::execute(QList< std::function<void(Types(&...args))
 	{
 		// call each callback with arguments
 		listCallbacks.at(i)(args...);
+	}
+}
+
+template<class ...Types>
+void QDeferredData<Types...>::zerop(std::function<void()> callback)
+{
+	// append to then callbacks list
+	m_zeropList.append(callback);
+	// call it inmediatly if already resolved or rejected
+	if (m_state == QDeferredState::RESOLVED || m_state == QDeferredState::REJECTED)
+	{
+		callback();
 	}
 }
 

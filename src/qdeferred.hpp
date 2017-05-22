@@ -38,6 +38,9 @@ public:
 	// reject method
 	void reject(Types(&...args));
 
+	// internal API
+	void zerop(std::function<void()> callback);
+
 protected:
 	QExplicitlySharedDataPointer<QDeferredData<Types...>> data;
 
@@ -111,5 +114,10 @@ void QDeferred<Types...>::reject(Types(&...args))
 	data->reject(args...);
 }
 
+template<class ...Types>
+void QDeferred<Types...>::zerop(std::function<void()> callback)
+{
+	data->zerop(callback);
+}
 
 #endif // QDEFERRED_H
