@@ -29,55 +29,6 @@ void testShared(QDeferred<int, double> def)
 	});
 }
 
-// TODO : almost ! need to pass void std::function to both methods
-template <typename T>
-void when(T t)
-{
-
-}
-
-// TODO : moved as static method of QDeferred
-// extra API
-// when method
-template <typename T, typename... Rest>
-QDeferred<> when(T t, Rest... rest)
-{
-	QDeferred<> retDeferred;
-
-	auto allThenFunc = [retDeferred]() {
-		qDebug() << "[INFO] WHAAAAAAAAAAAAAAAAAAAAAAAAAAAT"; // now called only for deferred1 and deferred4 because void when(T t) not implemented
-	};
-
-	t.zerop(allThenFunc);
-
-	when(rest...);
-
-	return retDeferred;
-
-	//qDebug() << "QDeferred<>::when called";
-	//// create deferred and resolve/fail it when all input deferreds have resolved/failed
-	//QDeferred<> retDeferred;
-	//// loop all input deferreds
-	//for (int i = 0; i < listDeferred.length(); i++)
-	//{
-	//	qDebug() << "Loop " << i;
-	//	// NOTE : Requires mutable because by default a function object should produce the same result every time it's called
-	//	// http://stackoverflow.com/questions/5501959/why-does-c0xs-lambda-require-mutable-keyword-for-capture-by-value-by-defau
-	//	listDeferred[i].done([listDeferred, retDeferred]() mutable {
-	//		static int iResolveCount = 0;
-	//		iResolveCount++;
-	//		// test if all resolved
-	//		if (iResolveCount == listDeferred.length())
-	//		{
-	//			// NOTE : resolve with args of last to resolve
-	//			retDeferred.resolve();
-	//		}
-	//	});
-	//}
-	//// return
-	//return retDeferred;
-}
-
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
@@ -85,10 +36,16 @@ int main(int argc, char *argv[])
 	QDeferred<QList<QVariant>>          deferred1;
 	QDeferred<QList<QVariant>, QString> deferred2;
 	QDeferred<int, double>              deferred3;
-	QDeferred<>                         deferred4;
-	QDeferred<>                         deferred5;
+	QDefer deferred4;
+	QDefer deferred5;
 
-	when(deferred1, deferred4, deferred5);
+	QDefer::when(deferred1, deferred4, deferred5).then([]() {
+		qDebug() << "[INFO] YYYYYYYYYYYYYY";
+	});
+
+	QDefer::when(deferred2, deferred3, deferred4).then([]() {
+		qDebug() << "[INFO] ZZZZZZZZZZZZZZ";
+	});
 
 	qDebug() << "[INFO] deferred1.state() = " << deferred1.state();
 	qDebug() << "[INFO] deferred2.state() = " << deferred2.state();
