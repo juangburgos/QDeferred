@@ -18,6 +18,17 @@ http://www.cprogramming.com/c++11/c++11-lambda-closures.html
 [this]	    Capture the this pointer of the enclosing class
 */
 
+// TODO : make thread safe!
+/*
+An idea is to keep an internal QMap<QThread, QObject>, one QObject per thread
+then assign each std::function to its own thread (QObject).
+When the deferred is either resolved or rejected, then post an special event
+to each of the objects with the arguments.
+Then in the QObject overwrite the event method to execute its own std::function's
+that will be executed in the QObject's thread affinity due to Qt's event loop.
+(hopefully)
+*/
+
 void testShared(QDeferred<int, double> def) 
 {
 	qDebug() << "[INFO] Called testShared ";
@@ -39,12 +50,22 @@ int main(int argc, char *argv[])
 	QDefer deferred4;
 	QDefer deferred5;
 
-	QDefer::when(deferred1, deferred4, deferred5).then([]() {
-		qDebug() << "[INFO] YYYYYYYYYYYYYY";
+	QDefer::when(deferred1, deferred4, deferred5)
+	  .done([]() {
+		qDebug() << "[INFO] First when has done.";
+	}).fail([]() {
+		qDebug() << "[INFO] First when has failed.";
+	}).then([]() {
+		qDebug() << "[INFO] First when has thened.";
 	});
 
-	QDefer::when(deferred2, deferred3, deferred4).then([]() {
-		qDebug() << "[INFO] ZZZZZZZZZZZZZZ";
+	QDefer::when(deferred2, deferred3, deferred4)
+	  .done([]() {
+		qDebug() << "[INFO] Second when has done.";
+	}).fail([]() {
+		qDebug() << "[INFO] Second when has failed.";
+	}).then([]() {
+		qDebug() << "[INFO] Second when has thenned.";
 	});
 
 	qDebug() << "[INFO] deferred1.state() = " << deferred1.state();

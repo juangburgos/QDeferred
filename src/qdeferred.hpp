@@ -44,7 +44,12 @@ public:
 	void reject(Types(&...args));
 
 	// internal API
-	void zerop(std::function<void()> callback);
+	// TODO : find a way to make it private, now fails to compile in static whenInternal methods
+
+	// done method with zero arguments
+	void doneZero(std::function<void()> callback);
+	// fail method with zero arguments
+	void failZero(std::function<void()> callback);
 
 protected:
 	QExplicitlySharedDataPointer<QDeferredData<Types...>> data;
@@ -52,10 +57,10 @@ protected:
 private:
 	// when internal method speacialization
 	template <typename T>
-	static void whenInternal(std::function<void()> callbackInternal, T t);
+	static void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t);
 	// when internal method
 	template <typename T, typename... Rest>
-	static void whenInternal(std::function<void()> callbackInternal, T t, Rest... rest);
+	static void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest);
 };
 
 // alias for no argument types
@@ -130,29 +135,44 @@ void QDeferred<Types...>::reject(Types(&...args))
 }
 
 template<class ...Types>
-void QDeferred<Types...>::zerop(std::function<void()> callback)
+void QDeferred<Types...>::doneZero(std::function<void()> callback)
 {
-	data->zerop(callback);
+	data->doneZero(callback);
+}
+
+template<class ...Types>
+void QDeferred<Types...>::failZero(std::function<void()> callback)
+{
+	data->failZero(callback);
 }
 
 template<class ...Types> // NOTE : necessary to belong to class
 template <typename T>
-static void QDeferred<Types...>::whenInternal(std::function<void()> callbackInternal, T t)
+static void QDeferred<Types...>::whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t)
 {
-	// add to zero params list
-	t.zerop(callbackInternal);
+	// add to done zero params list
+	t.doneZero(doneCallback);
+	// add to fail zero params list
+	t.failZero(failCallback);
 }
 
 template<class ...Types>
 template <typename T, typename... Rest>
-static void QDeferred<Types...>::whenInternal(std::function<void()> callbackInternal, T t, Rest... rest)
+static void QDeferred<Types...>::whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest)
 {
-	// add to zero params list
-	t.zerop(callbackInternal);
-	// expand by recursion
-	whenInternal(callbackInternal, rest...);
+	// process single deferred
+	whenInternal(doneCallback, failCallback, t);
+	// expand by recursion, process rest of deferreds
+	whenInternal(doneCallback, failCallback, rest...);
 }
 
+/*
+https://api.jquery.com/jQuery.when/
+In the case where multiple Deferred objects are passed to jQuery.when(), the method returns the Promise from a
+new "master" Deferred object that tracks the aggregate state of all the Deferreds it has been passed.
+The method will resolve its master Deferred as soon as all the Deferreds resolve, or reject the master
+Deferred as soon as one of the Deferreds is rejected.
+*/
 template<class ...Types>
 template <class ...OtherTypes, typename... Rest>
 static QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest)
@@ -160,26 +180,21 @@ static QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest
 	// setup necessary variables for expansion
 	QDefer retDeferred;
 	int    countArgs = sizeof...(Rest)+1;
-	auto allThenFunc = [retDeferred, countArgs]() mutable {
+	// done callback, resolve if ALL done
+	auto doneCallback = [retDeferred, countArgs]() mutable {
 		static int countThen = 0;
 		countThen++;
 		if (countThen == countArgs)
 		{
-			// TODO : resolve only if all resolve, reject if al least one rejected
-			//        will need to make a zerop for done and a zerop for fail to be
-			//        able to count individually
-			/*
-			https://api.jquery.com/jQuery.when/
-			In the case where multiple Deferred objects are passed to jQuery.when(), the method returns the Promise from a 
-			new "master" Deferred object that tracks the aggregate state of all the Deferreds it has been passed. 
-			The method will resolve its master Deferred as soon as all the Deferreds resolve, or reject the master 
-			Deferred as soon as one of the Deferreds is rejected.
-			*/
 			retDeferred.resolve();
 		}
 	};
+	// fail callback, reject if ONE fails
+	auto failCallback = [retDeferred]() mutable {
+		retDeferred.reject();
+	};
 	// expand
-	whenInternal(allThenFunc, t, rest...);
+	whenInternal(doneCallback, failCallback, t, rest...);
 	// return deferred
 	return retDeferred;
 }

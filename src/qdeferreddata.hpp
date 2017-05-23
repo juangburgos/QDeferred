@@ -41,20 +41,27 @@ public:
 	void reject(Types(&...args));
 
 	// internal API
-	void zerop(std::function<void()> callback);
+
+	// done method with zero arguments
+	void doneZero(std::function<void()> callback);
+	// fail method with zero arguments
+	void failZero(std::function<void()> callback);
 
 private:
 	// members
 	QList< std::function<void(Types(&...args))> > m_doneList;
 	QList< std::function<void(Types(&...args))> > m_failList;
 	QList< std::function<void(Types(&...args))> > m_thenList;
-	QList< std::function<void()> > m_zeropList;
+	QList< std::function<void()> > m_doneZeroList;
+	QList< std::function<void()> > m_failZeroList;
 	QDeferredState m_state;
 	std::function<void(std::function<void(Types(&...args))>)> m_finishedFunction;
 	// methods
 	void execute(QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args));
 
 };
+
+
 
 template<class ...Types>
 QDeferredData<Types...>::QDeferredData()
@@ -115,6 +122,11 @@ void QDeferredData<Types...>::then(std::function<void(Types(&...args))> callback
 template<class ...Types>
 void QDeferredData<Types...>::resolve(Types(&...args))
 {
+	// early exit if deferred has been already resolved or rejected
+	if (m_state != QDeferredState::PENDING)
+	{
+		qWarning() << "Cannot resolve already processed deferred object.";
+	}
 	// change state
 	m_state = QDeferredState::RESOLVED;
 	// set finished function
@@ -125,17 +137,22 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 	this->execute(this->m_doneList, args...);
 	// execute all then callbacks
 	this->execute(this->m_thenList, args...);
-	// loop all zerop callbacks
-	for (int i = 0; i < m_zeropList.length(); i++)
+	// loop all done zero callbacks
+	for (int i = 0; i < m_doneZeroList.length(); i++)
 	{
-		// call each callback with arguments
-		m_zeropList.at(i)();
+		// call each callback
+		m_doneZeroList.at(i)();
 	}
 }
 
 template<class ...Types>
 void QDeferredData<Types...>::reject(Types(&...args))
 {
+	// early exit if deferred has been already resolved or rejected
+	if (m_state != QDeferredState::PENDING)
+	{
+		qWarning() << "Cannot reject already processed deferred object.";
+	}
 	// change state
 	m_state = QDeferredState::REJECTED;
 	// set finished function
@@ -146,11 +163,11 @@ void QDeferredData<Types...>::reject(Types(&...args))
 	this->execute(this->m_failList, args...);
 	// execute all then callbacks
 	this->execute(this->m_thenList, args...);
-	// loop all zerop callbacks
-	for (int i = 0; i < m_zeropList.length(); i++)
+	// loop all fail zero callbacks
+	for (int i = 0; i < m_failZeroList.length(); i++)
 	{
-		// call each callback with arguments
-		m_zeropList.at(i)();
+		// call each callback
+		m_failZeroList.at(i)();
 	}
 }
 
@@ -166,12 +183,24 @@ void QDeferredData<Types...>::execute(QList< std::function<void(Types(&...args))
 }
 
 template<class ...Types>
-void QDeferredData<Types...>::zerop(std::function<void()> callback)
+void QDeferredData<Types...>::doneZero(std::function<void()> callback)
 {
-	// append to then callbacks list
-	m_zeropList.append(callback);
-	// call it inmediatly if already resolved or rejected
-	if (m_state == QDeferredState::RESOLVED || m_state == QDeferredState::REJECTED)
+	// append to done zero callbacks list
+	m_doneZeroList.append(callback);
+	// call it inmediatly if already resolved
+	if (m_state == QDeferredState::RESOLVED)
+	{
+		callback();
+	}
+}
+
+template<class ...Types>
+void QDeferredData<Types...>::failZero(std::function<void()> callback)
+{
+	// append to fail zero callbacks list
+	m_failZeroList.append(callback);
+	// call it inmediatly if already rejected
+	if (m_state == QDeferredState::REJECTED)
 	{
 		callback();
 	}
