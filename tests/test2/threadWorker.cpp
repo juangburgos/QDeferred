@@ -18,13 +18,19 @@ void threadWorker::setDeferred2(QDeferred<int, double> deferred2)
 void threadWorker::doWork1()
 {
 	// print id
-	qDebug() << "[INFO] FIRST thread id = " << QThread::currentThreadId();
+	qDebug() << "[INFO] 1_ST thread id = " << QThread::currentThreadId();
 	// set done
 	m_deferred1.done([]() {
-		qDebug() << "[INFO] THREADWORKER::DOWORK1 callback for DEF1 executed in thread " << QThread::currentThreadId();
+		qDebug() << "[INFO] 1_WKTHD callback DEF1 exec thread " << QThread::currentThreadId();
+	});
+	m_deferred2.done([](int i, double d) {
+		Q_UNUSED(i)
+			Q_UNUSED(d)
+			qDebug() << "[INFO] 1_WKTHD callback DEF2 exec thread " << QThread::currentThreadId();
 	});
 	// set resolve timer
 	QTimer::singleShot(1000, [&]() {
+		qDebug() << "[INFO] DEF1 resolved ----------------------------- ";
 		m_deferred1.resolve();
 	});
 }
@@ -32,15 +38,21 @@ void threadWorker::doWork1()
 void threadWorker::doWork2()
 {
 	// print id
-	qDebug() << "[INFO] SECOND thread id = " << QThread::currentThreadId();
+	qDebug() << "[INFO] 2_ND thread id = " << QThread::currentThreadId();
 	// set done
 	m_deferred2.done([](int i, double d) {
-		qDebug() << "[INFO] THREADWORKER::DOWORK2 callback for DEF2 executed in thread " << QThread::currentThreadId();
+		Q_UNUSED(i)
+		Q_UNUSED(d)
+		qDebug() << "[INFO] 2_WKTHD callback DEF2 exec thread " << QThread::currentThreadId();
+	});
+	m_deferred1.done([]() {
+		qDebug() << "[INFO] 2_WKTHD callback DEF1 exec thread " << QThread::currentThreadId();
 	});
 	// set resolve timer
-	QTimer::singleShot(1000, [&]() {
+	QTimer::singleShot(1200, [&]() {
 		int    iNum = 666;
 		double dNum = 666.666;
+		qDebug() << "[INFO] DEF2 resolved ----------------------------- ";
 		m_deferred2.resolve(iNum, dNum);
 	});
 }

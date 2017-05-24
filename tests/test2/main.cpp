@@ -39,17 +39,21 @@ int main(int argc, char *argv[])
 	qDebug() << "[INFO] MAIN thread id = " << QThread::currentThreadId();
 
 	deferred1.done([]() {
-		qDebug() << "[INFO] MAIN callback for DEF1 executed in thread " << QThread::currentThreadId();
+		qDebug() << "[INFO] MAINTHD callback DEF1 exec thread " << QThread::currentThreadId();
 	});
 	deferred2.done([](int i, double d) {
-		qDebug() << "[INFO] MAIN callback for DEF2 executed in thread " << QThread::currentThreadId();
+		Q_UNUSED(i)
+		Q_UNUSED(d)
+		qDebug() << "[INFO] MAINTHD callback DEF2 exec thread " << QThread::currentThreadId();
 	});
 	
 	threadController controller1;
 	threadController controller2;
 
 	controller1.setDeferred1(deferred1);
+	controller1.setDeferred2(deferred2);
 	controller2.setDeferred2(deferred2);
+	controller2.setDeferred1(deferred1);
 	
 	emit controller1.operate1();
 	emit controller2.operate2();

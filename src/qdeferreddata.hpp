@@ -72,7 +72,12 @@ QDeferredData<Types...>::QDeferredData()
 template<class ...Types>
 QDeferredData<Types...>::QDeferredData(const QDeferredData &other) : QSharedData(other),
 m_doneList(other.m_doneList),
-m_failList(other.m_failList)
+m_failList(other.m_failList),
+m_thenList(other.m_thenList),
+m_doneZeroList(other.m_doneZeroList),
+m_failZeroList(other.m_failZeroList),
+m_state(other.m_state),
+m_finishedFunction(other.m_finishedFunction)
 {
 	// nothing to do here
 }
@@ -129,7 +134,7 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 	}
 	// change state
 	m_state = QDeferredState::RESOLVED;
-	// set finished function
+	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after resolve)
 	m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
 		callback(args...);
 	};
@@ -155,7 +160,7 @@ void QDeferredData<Types...>::reject(Types(&...args))
 	}
 	// change state
 	m_state = QDeferredState::REJECTED;
-	// set finished function
+	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after reject)
 	m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
 		callback(args...);
 	};
