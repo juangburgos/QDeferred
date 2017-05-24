@@ -36,15 +36,15 @@ int main(int argc, char *argv[])
 	QDefer                 deferred1;
 	QDeferred<int, double> deferred2;
 
-	qDebug() << "[INFO] MAIN thread id = " << QThread::currentThreadId();
+	qDebug() << "[INFO] MAIN thread id = " << QThread::currentThread();
 
 	deferred1.done([]() {
-		qDebug() << "[INFO] MAINTHD callback DEF1 exec thread " << QThread::currentThreadId();
+		qDebug() << "[INFO] MAINTHD callback DEF1 exec thread " << QThread::currentThread();
 	});
 	deferred2.done([](int i, double d) {
 		Q_UNUSED(i)
 		Q_UNUSED(d)
-		qDebug() << "[INFO] MAINTHD callback DEF2 exec thread " << QThread::currentThreadId();
+		qDebug() << "[INFO] MAINTHD callback DEF2 exec thread " << QThread::currentThread();
 	});
 	
 	threadController controller1;

@@ -1,9 +1,12 @@
 #ifndef QDEFERREDDATA_H
 #define QDEFERREDDATA_H
 
+#include <QCoreApplication>
 #include <QSharedData>
 #include <QList>
 #include <functional>
+
+#include "qdeferredproxyobject.h"
 
 enum QDeferredState
 {
@@ -49,19 +52,41 @@ public:
 
 private:
 	// members
-	QList< std::function<void(Types(&...args))> > m_doneList;
-	QList< std::function<void(Types(&...args))> > m_failList;
-	QList< std::function<void(Types(&...args))> > m_thenList;
-	QList< std::function<void()> > m_doneZeroList;
-	QList< std::function<void()> > m_failZeroList;
+
+	// TODO         : QMap < QThread *, QObject  >
+	// TODO foreach : QMap < QThread *, QList<XXX> >
+
+	QList< std::function<void(Types(&...args))> > m_doneList    ;
+	QList< std::function<void(Types(&...args))> > m_failList    ;
+	QList< std::function<void(Types(&...args))> > m_thenList    ;
+	QList< std::function<void()               > > m_doneZeroList;
+	QList< std::function<void()               > > m_failZeroList;
+	QMap< QThread *, QDeferredProxyObject > m_threadMap;
 	QDeferredState m_state;
 	std::function<void(std::function<void(Types(&...args))>)> m_finishedFunction;
 	// methods
-	void execute(QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args));
-
+	void execute    (QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args));
+	void executeZero(QList< std::function<void()               > > &listCallbacks);
+	void addObjectForThread();
 };
 
-
+template<class ...Types>
+void QDeferredData<Types...>::addObjectForThread()
+{
+	// get current thread
+	QThread * p_currThd = QThread::currentThread();
+	// if not in list then...
+	if (!m_threadMap.contains(p_currThd))
+	{
+		// subscribe to finish
+		QObject::connect(p_currThd, &QThread::finished, [&]() {
+			// if finish remove from all maps
+			m_threadMap.remove(p_currThd);
+		});
+		// add to all maps
+		m_threadMap[p_currThd] = QDeferredProxyObject();
+	}
+}
 
 template<class ...Types>
 QDeferredData<Types...>::QDeferredData()
@@ -91,6 +116,8 @@ QDeferredState QDeferredData<Types...>::state()
 template<class ...Types>
 void QDeferredData<Types...>::done(std::function<void(Types(&...args))> callback)
 {
+	// add object for thread if does not exists
+	this->addObjectForThread();
 	// append to done callbacks list
 	m_doneList.append(callback);
 	// call it inmediatly if already resolved
@@ -103,6 +130,8 @@ void QDeferredData<Types...>::done(std::function<void(Types(&...args))> callback
 template<class ...Types>
 void QDeferredData<Types...>::fail(std::function<void(Types(&...args))> callback)
 {
+	// add object for thread if does not exists
+	this->addObjectForThread();
 	// append to fail callbacks list
 	m_failList.append(callback);
 	// call it inmediatly if already rejected
@@ -115,6 +144,8 @@ void QDeferredData<Types...>::fail(std::function<void(Types(&...args))> callback
 template<class ...Types>
 void QDeferredData<Types...>::then(std::function<void(Types(&...args))> callback)
 {
+	// add object for thread if does not exists
+	this->addObjectForThread();
 	// append to then callbacks list
 	m_thenList.append(callback);
 	// call it inmediatly if already resolved or rejected
@@ -138,16 +169,33 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 	m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
 		callback(args...);
 	};
+
+	// TODO :
+	/*
+		Here for each QDeferredProxyObject for each thread define in its execute function to execute
+		the functions that belong to that thread, then send to it with QCoreApplication::postEvent
+
+	*/
+	QMapIterator<QThread *, QDeferredProxyObject> i(m_threadMap);
+	while (i.hasNext()) {
+		i.next();
+		// set test function
+		auto currThread = i.key();
+		auto p_currObj  = &m_threadMap[currThread];
+		p_currObj->m_perThreadFunc = [currThread]() {
+			qDebug() << "[INFO] Callback for thread " << currThread << " exec in thread " << QThread::currentThread();
+		};
+		// post event for object
+		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+		QCoreApplication::postEvent(p_currObj, p_Evt);
+	}
+
 	// execute all done callbacks
 	this->execute(this->m_doneList, args...);
 	// execute all then callbacks
 	this->execute(this->m_thenList, args...);
 	// loop all done zero callbacks
-	for (int i = 0; i < m_doneZeroList.length(); i++)
-	{
-		// call each callback
-		m_doneZeroList.at(i)();
-	}
+	this->executeZero(this->m_doneZeroList);
 }
 
 template<class ...Types>
@@ -169,11 +217,7 @@ void QDeferredData<Types...>::reject(Types(&...args))
 	// execute all then callbacks
 	this->execute(this->m_thenList, args...);
 	// loop all fail zero callbacks
-	for (int i = 0; i < m_failZeroList.length(); i++)
-	{
-		// call each callback
-		m_failZeroList.at(i)();
-	}
+	this->executeZero(this->m_failZeroList);
 }
 
 template<class ...Types>
@@ -190,6 +234,8 @@ void QDeferredData<Types...>::execute(QList< std::function<void(Types(&...args))
 template<class ...Types>
 void QDeferredData<Types...>::doneZero(std::function<void()> callback)
 {
+	// add object for thread if does not exists
+	this->addObjectForThread();
 	// append to done zero callbacks list
 	m_doneZeroList.append(callback);
 	// call it inmediatly if already resolved
@@ -202,12 +248,25 @@ void QDeferredData<Types...>::doneZero(std::function<void()> callback)
 template<class ...Types>
 void QDeferredData<Types...>::failZero(std::function<void()> callback)
 {
+	// add object for thread if does not exists
+	this->addObjectForThread();
 	// append to fail zero callbacks list
 	m_failZeroList.append(callback);
 	// call it inmediatly if already rejected
 	if (m_state == QDeferredState::REJECTED)
 	{
 		callback();
+	}
+}
+
+template<class ...Types>
+void QDeferredData<Types...>::executeZero(QList< std::function<void()> > &listCallbacks)
+{
+	// loop all callbacks
+	for (int i = 0; i < listCallbacks.length(); i++)
+	{
+		// call each callback without arguments
+		listCallbacks.at(i)();
 	}
 }
 
