@@ -302,4 +302,26 @@ typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>
 	return m_callbacksMap[p_currThd];
 }
 
+namespace QDEFERRED_INTERNAL {
+
+	template<class T>
+	void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t)
+	{
+		// add to done zero params list
+		t.doneZero(doneCallback);
+		// add to fail zero params list
+		t.failZero(failCallback);
+	}
+
+	template<class T, class... Rest>
+	void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest)
+	{
+		// process single deferred
+		whenInternal(doneCallback, failCallback, t);
+		// expand by recursion, process rest of deferreds
+		whenInternal(doneCallback, failCallback, rest...);
+	}
+
+}
+
 #endif // QDEFERREDDATA_H

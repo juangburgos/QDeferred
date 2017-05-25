@@ -43,32 +43,31 @@ public:
 	// reject method
 	void reject(Types(&...args));
 
-	// internal API
-	// TODO : find a way to make it private, now fails to compile in static whenInternal methods
-
-	// done method with zero arguments
-	void doneZero(std::function<void()> callback);
-	// fail method with zero arguments
-	void failZero(std::function<void()> callback);
-	
 protected:
 	QExplicitlySharedDataPointer<QDeferredData<Types...>> m_data;
 
 private:
-	
+
+	// friend functions
+
 	// when internal method speacialization
 	template <typename T>
-	static void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t);
+	friend void QDEFERRED_INTERNAL::whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t);
 	// when internal method
 	template <typename T, typename... Rest>
-	static void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest);
+	friend void QDEFERRED_INTERNAL::whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest);
+
+	// internal methods
+
 	// get when count method
 	int  getWhenCount();
 	// set when count method
 	void setWhenCount(int whenCount);
 
-
-
+	// done method with zero arguments
+	void doneZero(std::function<void()> callback);
+	// fail method with zero arguments
+	void failZero(std::function<void()> callback);
 };
 
 // alias for no argument types
@@ -154,26 +153,6 @@ void QDeferred<Types...>::failZero(std::function<void()> callback)
 	m_data->failZero(callback);
 }
 
-template<class ...Types> // NOTE : necessary to belong to class
-template<class T>
-static void QDeferred<Types...>::whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t)
-{
-	// add to done zero params list
-	t.doneZero(doneCallback);
-	// add to fail zero params list
-	t.failZero(failCallback);
-}
-
-template<class ...Types>
-template<class T, class... Rest>
-static void QDeferred<Types...>::whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest)
-{
-	// process single deferred
-	whenInternal(doneCallback, failCallback, t);
-	// expand by recursion, process rest of deferreds
-	whenInternal(doneCallback, failCallback, rest...);
-}
-
 /*
 https://api.jquery.com/jQuery.when/
 In the case where multiple Deferred objects are passed to jQuery.when(), the method returns the Promise from a
@@ -202,7 +181,7 @@ static QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest
 		retDeferred.reject();
 	};
 	// expand
-	whenInternal(doneCallback, failCallback, t, rest...);
+	QDEFERRED_INTERNAL::whenInternal(doneCallback, failCallback, t, rest...);
 	// return deferred
 	return retDeferred;
 }
