@@ -12,8 +12,6 @@ class QDeferredProxyObject : public QObject
     Q_OBJECT
 public:
     explicit QDeferredProxyObject();
-	QDeferredProxyObject(const QDeferredProxyObject &obj);
-	QDeferredProxyObject &operator=(const QDeferredProxyObject &);
 
 	bool event(QEvent* ev);
 

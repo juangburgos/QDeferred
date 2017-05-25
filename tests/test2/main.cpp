@@ -18,17 +18,6 @@ http://www.cprogramming.com/c++11/c++11-lambda-closures.html
 [this]	    Capture the this pointer of the enclosing class
 */
 
-// TODO : make thread safe!
-/*
-An idea is to keep an internal QMap<QThread, QObject>, one QObject per thread
-then assign each std::function to its own thread (QObject).
-When the deferred is either resolved or rejected, then post an special event
-to each of the objects with the arguments.
-Then in the QObject overwrite the event method to execute its own std::function's
-that will be executed in the QObject's thread affinity due to Qt's event loop.
-(hopefully)
-*/
-
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
@@ -36,15 +25,16 @@ int main(int argc, char *argv[])
 	QDefer                 deferred1;
 	QDeferred<int, double> deferred2;
 
-	qDebug() << "[INFO] MAIN thread id = " << QThread::currentThread();
+	auto p_thread = QThread::currentThread();
+	qDebug() << "[INFO] 0 thread id = " << p_thread;
 
-	deferred1.done([]() {
-		qDebug() << "[INFO] MAINTHD callback DEF1 exec thread " << QThread::currentThread();
+	deferred1.done([p_thread]() {
+		qDebug() << "[INFO] DEF1::Callback defined in 0 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 	});
-	deferred2.done([](int i, double d) {
+	deferred2.done([p_thread](int i, double d) {
 		Q_UNUSED(i)
 		Q_UNUSED(d)
-		qDebug() << "[INFO] MAINTHD callback DEF2 exec thread " << QThread::currentThread();
+		qDebug() << "[INFO] DEF2::Callback defined in 0 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 	});
 	
 	threadController controller1;
@@ -60,5 +50,4 @@ int main(int argc, char *argv[])
 	
     return a.exec();
 }
-
 
