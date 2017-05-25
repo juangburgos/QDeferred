@@ -36,6 +36,9 @@ int main(int argc, char *argv[])
 		Q_UNUSED(d)
 		qDebug() << "[INFO] DEF2::Callback defined in 0 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 	});
+	QDefer::when(deferred1, deferred2).done([p_thread]() {
+		qDebug() << "[INFO] WHEN::Callback defined in 0 thread " << p_thread << ", exec in thread " << QThread::currentThread();
+	});
 	
 	threadController controller1;
 	threadController controller2;

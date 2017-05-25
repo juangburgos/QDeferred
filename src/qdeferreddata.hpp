@@ -52,12 +52,10 @@ public:
 	// fail method with zero arguments
 	void failZero(std::function<void()> callback);
 
+	// when memory
+	int m_whenCount = 0;
+
 private:
-	// members
-
-	// TODO         : QMap < QThread *, QObject  >
-	// TODO foreach : QMap < QThread *, QList<XXX> >
-
 	struct DeferredAllCallbacks {
 		QList< std::function<void(Types(&...args))> > m_doneList;
 		QList< std::function<void(Types(&...args))> > m_failList;
@@ -65,6 +63,7 @@ private:
 		QList< std::function<void()               > > m_doneZeroList;
 		QList< std::function<void()               > > m_failZeroList;
 	};
+	// members
 	QMap< QThread *, QDeferredProxyObject * > m_threadMap;
 	QMap< QThread *, DeferredAllCallbacks * > m_callbacksMap;
 	QDeferredState m_state;
@@ -74,34 +73,6 @@ private:
 	void executeZero(QList< std::function<void()               > > &listCallbacks);
 	DeferredAllCallbacks * getCallbaksForThread();
 };
-
-template<class ...Types>
-typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>::getCallbaksForThread()
-{
-	// get current thread
-	QThread * p_currThd = QThread::currentThread();
-	// if not in list then...
-	if (!m_threadMap.contains(p_currThd))
-	{
-		// subscribe to finish
-		QObject::connect(p_currThd, &QThread::finished, [&]() {
-			// if finished
-			// remove from all maps
-			auto p_objToDelete = m_threadMap.take(p_currThd);
-			// wait until object destroyed to remove callbacks struct
-			QObject::connect(p_objToDelete, &QObject::destroyed, [&]() {
-				delete m_callbacksMap.take(p_currThd);
-			});
-			// mark the object ofr deletion
-			p_objToDelete->deleteLater();
-		});
-		// add to all maps
-		m_threadMap[p_currThd]    = new QDeferredProxyObject;
-		m_callbacksMap[p_currThd] = new QDeferredData<Types...>::DeferredAllCallbacks;
-	}
-	// return
-	return m_callbacksMap[p_currThd];
-}
 
 template<class ...Types>
 QDeferredData<Types...>::QDeferredData()
@@ -119,11 +90,9 @@ QDeferredData<Types...>::~QDeferredData()
 
 template<class ...Types>
 QDeferredData<Types...>::QDeferredData(const QDeferredData &other) : QSharedData(other),
-m_doneList(other.m_doneList),
-m_failList(other.m_failList),
-m_thenList(other.m_thenList),
-m_doneZeroList(other.m_doneZeroList),
-m_failZeroList(other.m_failZeroList),
+m_whenCount(other.m_whenCount),
+m_threadMap(other.m_threadMap),
+m_callbacksMap(other.m_callbacksMap),
 m_state(other.m_state),
 m_finishedFunction(other.m_finishedFunction)
 {
@@ -302,6 +271,35 @@ void QDeferredData<Types...>::executeZero(QList< std::function<void()> > &listCa
 		// call each callback without arguments
 		listCallbacks.at(i)();
 	}
+}
+
+// https://stackoverflow.com/questions/13559756/declaring-a-struct-in-a-template-class-undefined-for-member-functions
+template<class ...Types>
+typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>::getCallbaksForThread()
+{
+	// get current thread
+	QThread * p_currThd = QThread::currentThread();
+	// if not in list then...
+	if (!m_threadMap.contains(p_currThd))
+	{
+		// subscribe to finish
+		QObject::connect(p_currThd, &QThread::finished, [&]() {
+			// if finished
+			// remove from all maps
+			auto p_objToDelete = m_threadMap.take(p_currThd);
+			// wait until object destroyed to remove callbacks struct
+			QObject::connect(p_objToDelete, &QObject::destroyed, [&]() {
+				delete m_callbacksMap.take(p_currThd);
+			});
+			// mark the object ofr deletion
+			p_objToDelete->deleteLater();
+		});
+		// add to all maps
+		m_threadMap[p_currThd] = new QDeferredProxyObject;
+		m_callbacksMap[p_currThd] = new QDeferredData<Types...>::DeferredAllCallbacks;
+	}
+	// return
+	return m_callbacksMap[p_currThd];
 }
 
 #endif // QDEFERREDDATA_H

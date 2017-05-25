@@ -50,41 +50,49 @@ public:
 	void doneZero(std::function<void()> callback);
 	// fail method with zero arguments
 	void failZero(std::function<void()> callback);
-
+	
 protected:
-	QExplicitlySharedDataPointer<QDeferredData<Types...>> data;
+	QExplicitlySharedDataPointer<QDeferredData<Types...>> m_data;
 
 private:
+	
 	// when internal method speacialization
 	template <typename T>
 	static void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t);
 	// when internal method
 	template <typename T, typename... Rest>
 	static void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest);
+	// get when count method
+	int  getWhenCount();
+	// set when count method
+	void setWhenCount(int whenCount);
+
+
+
 };
 
 // alias for no argument types
 using QDefer = QDeferred<>;
 
 template<class ...Types>
-QDeferred<Types...>::QDeferred() : data(nullptr)
+QDeferred<Types...>::QDeferred() : m_data(nullptr)
 {
-	data = QExplicitlySharedDataPointer<QDeferredData<Types...>>(new QDeferredData<Types...>());
+	m_data = QExplicitlySharedDataPointer<QDeferredData<Types...>>(new QDeferredData<Types...>());
 }
 
 template<class ...Types>
-QDeferred<Types...>::QDeferred(const QDeferred<Types...> &other) : data(other.data)
+QDeferred<Types...>::QDeferred(const QDeferred<Types...> &other) : m_data(other.m_data)
 {
-	data.reset();
-	data = other.data;
+	m_data.reset();
+	m_data = other.m_data;
 }
 
 template<class ...Types>
 QDeferred<Types...> &QDeferred<Types...>::operator=(const QDeferred<Types...> &rhs)
 {
 	if (this != &rhs) {
-		data.reset();
-		data.operator=(rhs.data);
+		m_data.reset();
+		m_data.operator=(rhs.m_data);
 	}
 	return *this;
 }
@@ -92,62 +100,62 @@ QDeferred<Types...> &QDeferred<Types...>::operator=(const QDeferred<Types...> &r
 template<class ...Types>
 QDeferred<Types...>::~QDeferred()
 {
-	data.reset();
+	m_data.reset();
 }
 
 template<class ...Types>
 QDeferredState QDeferred<Types...>::state()
 {
-	return data->state();
+	return m_data->state();
 }
 
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::done(std::function<void(Types(&...args))> callback)
 {
-	data->done(callback);
+	m_data->done(callback);
 	return *this;
 }
 
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::fail(std::function<void(Types(&...args))> callback)
 {
-	data->fail(callback);
+	m_data->fail(callback);
 	return *this;
 }
 
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::then(std::function<void(Types(&...args))> callback)
 {
-	data->then(callback);
+	m_data->then(callback);
 	return *this;
 }
 
 template<class ...Types>
 void QDeferred<Types...>::resolve(Types(&...args))
 {
-	data->resolve(args...);
+	m_data->resolve(args...);
 }
 
 template<class ...Types>
 void QDeferred<Types...>::reject(Types(&...args))
 {
-	data->reject(args...);
+	m_data->reject(args...);
 }
 
 template<class ...Types>
 void QDeferred<Types...>::doneZero(std::function<void()> callback)
 {
-	data->doneZero(callback);
+	m_data->doneZero(callback);
 }
 
 template<class ...Types>
 void QDeferred<Types...>::failZero(std::function<void()> callback)
 {
-	data->failZero(callback);
+	m_data->failZero(callback);
 }
 
 template<class ...Types> // NOTE : necessary to belong to class
-template <typename T>
+template<class T>
 static void QDeferred<Types...>::whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t)
 {
 	// add to done zero params list
@@ -157,7 +165,7 @@ static void QDeferred<Types...>::whenInternal(std::function<void()> doneCallback
 }
 
 template<class ...Types>
-template <typename T, typename... Rest>
+template<class T, class... Rest>
 static void QDeferred<Types...>::whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest)
 {
 	// process single deferred
@@ -174,7 +182,7 @@ The method will resolve its master Deferred as soon as all the Deferreds resolve
 Deferred as soon as one of the Deferreds is rejected.
 */
 template<class ...Types>
-template <class ...OtherTypes, typename... Rest>
+template<class ...OtherTypes, class... Rest>
 static QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest)
 {
 	// setup necessary variables for expansion
@@ -182,9 +190,9 @@ static QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest
 	int    countArgs = sizeof...(Rest)+1;
 	// done callback, resolve if ALL done
 	auto doneCallback = [retDeferred, countArgs]() mutable {
-		static int countThen = 0;
-		countThen++;
-		if (countThen == countArgs)
+		retDeferred.setWhenCount(retDeferred.getWhenCount() + 1); // whenCount++
+		int whenCount = retDeferred.getWhenCount();
+		if (whenCount == countArgs)
 		{
 			retDeferred.resolve();
 		}
@@ -199,5 +207,16 @@ static QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest
 	return retDeferred;
 }
 
+template<class ...Types>
+void QDeferred<Types...>::setWhenCount(int whenCount)
+{
+	m_data->m_whenCount = whenCount;
+}
+
+template<class ...Types>
+int QDeferred<Types...>::getWhenCount()
+{
+	return m_data->m_whenCount;
+}
 
 #endif // QDEFERRED_H

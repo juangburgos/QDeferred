@@ -29,6 +29,9 @@ void threadWorker::doWork1()
 		Q_UNUSED(d)
 		qDebug() << "[INFO] DEF2::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 	});
+	QDefer::when(m_deferred1, m_deferred2).done([p_thread]() {
+		qDebug() << "[INFO] WHEN::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
+	});
 	// set resolve timer
 	QTimer::singleShot(1000, [&]() {
 		qDebug() << "[INFO] DEF1::Resolved in 1 thread ********" << QThread::currentThread() << "********";
@@ -49,6 +52,9 @@ void threadWorker::doWork2()
 	});
 	m_deferred1.done([p_thread]() {
 		qDebug() << "[INFO] DEF1::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
+	});
+	QDefer::when(m_deferred1, m_deferred2).done([p_thread]() {
+		qDebug() << "[INFO] WHEN::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 	});
 	// set resolve timer
 	QTimer::singleShot(1200, [&]() {
