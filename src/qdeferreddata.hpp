@@ -5,9 +5,42 @@
 #include <QSharedData>
 #include <QList>
 #include <QThread>
+#include <QMutex>
 #include <functional>
 
 #include "qdeferredproxyobject.h"
+
+// TODO : change for 
+/*
+https://stackoverflow.com/questions/10036770/c-template-class-with-static-members-same-for-all-types-of-the-class
+Have all the classes derive from a common base class, whose only responsibility is to contain the static member.
+*/
+
+namespace QDEFERRED_INTERNAL {
+
+	template<class T>
+	void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t)
+	{
+		// add to done zero params list
+		t.doneZero(doneCallback);
+		// add to fail zero params list
+		t.failZero(failCallback);
+	}
+
+	template<class T, class... Rest>
+	void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest)
+	{
+		// process single deferred
+		whenInternal(doneCallback, failCallback, t);
+		// expand by recursion, process rest of deferreds
+		whenInternal(doneCallback, failCallback, rest...);
+	}
+
+	static int s_createCount = 0;
+
+	static QMutex s_mutex;
+
+}
 
 enum QDeferredState
 {
@@ -38,12 +71,18 @@ public:
 	// then method
 	void then(std::function<void(Types(&...args))> callback);
 
+	// TODO : implement progress()
+	// https://api.jquery.com/deferred.progress/
+
 	// provider API
 
 	// resolve method
 	void resolve(Types(&...args));
 	// reject method
 	void reject(Types(&...args));
+
+	// TODO : implement notify()
+	// https://api.jquery.com/deferred.notify/
 
 	// internal API
 
@@ -56,6 +95,28 @@ public:
 	int m_whenCount = 0;
 
 private:
+	// TODO : find a way to make m_threadMap static so there is only
+	//        (1 x No. Threads) * QDeferredProxyObject instead of
+	//        (No. Deferred x No. Threads) * QDeferredProxyObject
+	// * this would imply splitting getCallbaksForThread() to add a new
+	//   static getObjectForThread() because the m_callbacksMap still has
+	//   to be non-static, i.e. one instance per object.
+	//   furthermore, access to static getObjectForThread() would need to
+	//   be thread safe (some kind of mutex mechanism)
+
+	/*
+	In summary, one QDeferredProxyObject per thread globally
+	Now per deferred, one DeferredAllCallbacks per QDeferredProxyObject
+	If thread is finished or exited, QDeferredProxyObject is deleted and
+	If QDeferredProxyObject is deleted, related DeferredAllCallbacks are
+	deleted across all deferred instances.
+	*/
+
+	// IMPORTANT : actually, static in a class scope would NOT work because
+	//             compiler creates a different class per type, therefore
+	//             the there would be a different 'static' per class, solution
+	//             must be global (for all types)
+
 	struct DeferredAllCallbacks {
 		QList< std::function<void(Types(&...args))> > m_doneList;
 		QList< std::function<void(Types(&...args))> > m_failList;
@@ -170,7 +231,9 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 		auto p_currThread     = i.key();
 		auto p_currObject     = m_threadMap[p_currThread];
 		auto p_currCallbacks  = m_callbacksMap[p_currThread];
-		p_currObject->m_perThreadFunc = [/* p_currThread, */this, p_currCallbacks, args...]() mutable {
+		// create object in heap and assign function (event loop takes ownership and deletes it later)
+		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+		p_Evt->m_eventFunc = [/* p_currThread, */this, p_currCallbacks, args...]() mutable {
 			//qDebug() << "[INFO] Callback for thread " << p_currThread << " exec in thread " << QThread::currentThread();
 			// execute all done callbacks
 			this->execute(p_currCallbacks->m_doneList, args...); // DONE
@@ -179,8 +242,7 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_doneZeroList);  // DONE
 		};
-		// post event for object (create in heap, event loop takes ownership and delets it later)
-		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+		// post event for object with correct thread affinity
 		QCoreApplication::postEvent(p_currObject, p_Evt);
 	}	
 }
@@ -206,9 +268,11 @@ void QDeferredData<Types...>::reject(Types(&...args))
 		i.next();
 		// set test function
 		auto p_currThread = i.key();
-		auto p_currObject = m_threadMap[p_currThread];
+		auto p_currObject    = m_threadMap[p_currThread];
 		auto p_currCallbacks = m_callbacksMap[p_currThread];
-		p_currObject->m_perThreadFunc = [/* p_currThread, */this, p_currCallbacks, args...]() mutable {
+		// create object in heap and assign function (event loop takes ownership and deletes it later)
+		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+		p_Evt->m_eventFunc = [this, p_currThread, p_currCallbacks, args...]() mutable {
 			//qDebug() << "[INFO] Callback for thread " << p_currThread << " exec in thread " << QThread::currentThread();
 			// execute all done callbacks
 			this->execute(p_currCallbacks->m_failList, args...); // FAIL
@@ -217,8 +281,7 @@ void QDeferredData<Types...>::reject(Types(&...args))
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_failZeroList);  // FAIL
 		};
-		// post event for object (create in heap, event loop takes ownership and delets it later)
-		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+		// post event for object with correct thread affinity
 		QCoreApplication::postEvent(p_currObject, p_Evt);
 	}
 }
@@ -273,10 +336,13 @@ void QDeferredData<Types...>::executeZero(QList< std::function<void()> > &listCa
 	}
 }
 
+
+
 // https://stackoverflow.com/questions/13559756/declaring-a-struct-in-a-template-class-undefined-for-member-functions
 template<class ...Types>
 typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>::getCallbaksForThread()
 {
+	QDEFERRED_INTERNAL::s_mutex.lock();
 	// get current thread
 	QThread * p_currThd = QThread::currentThread();
 	// if not in list then...
@@ -295,33 +361,17 @@ typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>
 			p_objToDelete->deleteLater();
 		});
 		// add to all maps
-		m_threadMap[p_currThd] = new QDeferredProxyObject;
+		m_threadMap[p_currThd]    = new QDeferredProxyObject;
 		m_callbacksMap[p_currThd] = new QDeferredData<Types...>::DeferredAllCallbacks;
+		// nothing to do here
+		QDEFERRED_INTERNAL::s_createCount++;
+		qDebug() << "[INFO] Number of QDeferredProxyObject created = " << QDEFERRED_INTERNAL::s_createCount;
 	}
+	QDEFERRED_INTERNAL::s_mutex.unlock();
 	// return
 	return m_callbacksMap[p_currThd];
 }
 
-namespace QDEFERRED_INTERNAL {
 
-	template<class T>
-	void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t)
-	{
-		// add to done zero params list
-		t.doneZero(doneCallback);
-		// add to fail zero params list
-		t.failZero(failCallback);
-	}
-
-	template<class T, class... Rest>
-	void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest)
-	{
-		// process single deferred
-		whenInternal(doneCallback, failCallback, t);
-		// expand by recursion, process rest of deferreds
-		whenInternal(doneCallback, failCallback, rest...);
-	}
-
-}
 
 #endif // QDEFERREDDATA_H

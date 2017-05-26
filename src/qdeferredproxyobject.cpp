@@ -6,7 +6,7 @@
 
 QDeferredProxyObject::QDeferredProxyObject() : QObject(nullptr)
 {
-	// nothing to do here
+	
 }
 
 bool QDeferredProxyObject::event(QEvent * ev)
@@ -15,7 +15,7 @@ bool QDeferredProxyObject::event(QEvent * ev)
 		//// DEBUG
 		//qDebug() << "[INFO] Event for object thread affinity " << this->thread() << " from thread " << QThread::currentThread();
 		// call function
-		this->m_perThreadFunc();	
+		static_cast<QDeferredProxyEvent*>(ev)->m_eventFunc();
 		// return event processed
 		return true;
 	}

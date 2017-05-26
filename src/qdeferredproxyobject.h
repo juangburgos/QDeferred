@@ -15,14 +15,14 @@ public:
 
 	bool event(QEvent* ev);
 
-	std::function<void()> m_perThreadFunc;
-
 };
 
 class QDeferredProxyEvent : public QEvent
 {
 public:
 	explicit QDeferredProxyEvent();
+
+	std::function<void()> m_eventFunc;
 
 };
 
