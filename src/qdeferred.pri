@@ -6,5 +6,5 @@ HEADERS  += $$PWD/qdeferred.hpp            \
             $$PWD/qdeferreddata.hpp        \
             $$PWD/qdeferredproxyobject.h
 
-SOURCES += \
-            $$PWD/qdeferredproxyobject.cpp
+SOURCES  += $$PWD/qdeferredproxyobject.cpp \
+            $$PWD/qdeferreddata.cpp

@@ -48,14 +48,8 @@ protected:
 
 private:
 
-	// friend functions
-
-	// when internal method speacialization
-	template <typename T>
-	friend void QDEFERRED_INTERNAL::whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t);
-	// when internal method
-	template <typename T, typename... Rest>
-	friend void QDEFERRED_INTERNAL::whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t, Rest... rest);
+	// friend class
+	friend class QDeferredDataBase;
 
 	// internal methods
 
@@ -181,7 +175,7 @@ static QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest
 		retDeferred.reject();
 	};
 	// expand
-	QDEFERRED_INTERNAL::whenInternal(doneCallback, failCallback, t, rest...);
+	QDeferredDataBase::whenInternal(doneCallback, failCallback, t, rest...);
 	// return deferred
 	return retDeferred;
 }
