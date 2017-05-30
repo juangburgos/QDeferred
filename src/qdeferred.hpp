@@ -126,13 +126,15 @@ QDeferred<Types...> QDeferred<Types...>::then(std::function<void(Types(&...args)
 template<class ...Types>
 void QDeferred<Types...>::resolve(Types(&...args))
 {
-	m_data->resolve(args...);
+	// pass reference to this to at least have 1 reference until callbacks get executed
+	m_data->resolve(*this, args...);
 }
 
 template<class ...Types>
 void QDeferred<Types...>::reject(Types(&...args))
 {
-	m_data->reject(args...);
+	// pass reference to this to at least have 1 reference until callbacks get executed
+	m_data->reject(*this, args...);
 }
 
 template<class ...Types>

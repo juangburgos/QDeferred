@@ -86,10 +86,10 @@ public:
 
 	// provider API
 
-	// resolve method
-	void resolve(Types(&...args));
+	// resolve method (ref added to avoid last reference deletion before callbacks execution)
+	void resolve(QDeferred<Types...> ref, Types(&...args));
 	// reject method
-	void reject(Types(&...args));
+	void reject(QDeferred<Types...> ref, Types(&...args));
 
 	// TODO : implement notify()
 	// https://api.jquery.com/deferred.notify/
@@ -203,7 +203,7 @@ void QDeferredData<Types...>::then(std::function<void(Types(&...args))> callback
 }
 
 template<class ...Types>
-void QDeferredData<Types...>::resolve(Types(&...args))
+void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 {
 	m_mutex.lock();
 	// early exit if deferred has been already resolved or rejected
@@ -217,6 +217,7 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 	m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
 		callback(args...);
 	};
+
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
 	while (i.hasNext()) 
@@ -228,7 +229,7 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 		auto p_currCallbacks  = m_callbacksMap[p_currThread];
 		// create object in heap and assign function (event loop takes ownership and deletes it later)
 		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [/* p_currThread, */this, p_currCallbacks, args...]() mutable {
+		p_Evt->m_eventFunc = [/* p_currThread, */ref, this, p_currCallbacks, args...]() mutable {
 			//qDebug() << "[INFO] Callback for thread " << p_currThread << " exec in thread " << QThread::currentThread();
 			// execute all done callbacks
 			this->execute(p_currCallbacks->m_doneList, args...); // DONE
@@ -236,6 +237,8 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 			this->execute(p_currCallbacks->m_thenList, args...); // THEN
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_doneZeroList);  // DONE
+			// unused, but we need it to keep at least one reference until all callbacks are executed
+			Q_UNUSED(ref)
 		};
 		// post event for object with correct thread affinity
 		QCoreApplication::postEvent(p_currObject, p_Evt);
@@ -244,7 +247,7 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 }
 
 template<class ...Types>
-void QDeferredData<Types...>::reject(Types(&...args))
+void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 {
 	m_mutex.lock();
 	// early exit if deferred has been already resolved or rejected
@@ -269,7 +272,7 @@ void QDeferredData<Types...>::reject(Types(&...args))
 		auto p_currCallbacks = m_callbacksMap[p_currThread];
 		// create object in heap and assign function (event loop takes ownership and deletes it later)
 		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [this, p_currThread, p_currCallbacks, args...]() mutable {
+		p_Evt->m_eventFunc = [/* p_currThread, */ref, this, p_currCallbacks, args...]() mutable {
 			//qDebug() << "[INFO] Callback for thread " << p_currThread << " exec in thread " << QThread::currentThread();
 			// execute all done callbacks
 			this->execute(p_currCallbacks->m_failList, args...); // FAIL
@@ -277,6 +280,8 @@ void QDeferredData<Types...>::reject(Types(&...args))
 			this->execute(p_currCallbacks->m_thenList, args...); // THEN
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_failZeroList);  // FAIL
+			// unused, but we need it to keep at least one reference until all callbacks are executed
+			Q_UNUSED(ref)
 		};
 		// post event for object with correct thread affinity
 		QCoreApplication::postEvent(p_currObject, p_Evt);

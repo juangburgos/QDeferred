@@ -50,11 +50,7 @@ int main(int argc, char *argv[])
 		delete p_controller1;
 	});
 
-	// TODO : chaining here does not work because last reference is in the threaded function
-	//        and when it gets resolved, gets out of scope and deleted. by the time the callbacks
-	//        are executed, the deferred is already gone and crash
-	auto xtest = controller2.doProgressWork(1500);	
-	xtest.done([p_thread](int num) {
+	controller2.doProgressWork(1500).done([p_thread](int num) {
 		qDebug() << "[INFO] DEF3::Callback defined in 0 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 		qDebug() << "[INFO] DEF3::Callback result was " << num;
 	});
