@@ -11,7 +11,7 @@ include(./../../src/qdeferred.pri)
 
 TEMPLATE = app
 
-HEADERS  += threadWorker.h
+HEADERS  += threadworker.h
 
 SOURCES += main.cpp \
-           threadWorker.cpp
+           threadworker.cpp

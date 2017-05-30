@@ -40,16 +40,11 @@ int main(int argc, char *argv[])
 		qDebug() << "[INFO] WHEN::Callback defined in 0 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 	});
 	
-	threadController * p_controller1 = new threadController;
-	threadController controller2;
+	ThreadController * p_controller1 = new ThreadController;
+	ThreadController controller2;
 
-	p_controller1->setDeferred1(deferred1);
-	p_controller1->setDeferred2(deferred2);
-	controller2.setDeferred2(deferred2);
-	controller2.setDeferred1(deferred1);
-	
-	emit p_controller1->operate1();
-	emit controller2.operate2();
+	p_controller1->doWorkOnFirstDeferred(deferred1, deferred2);
+	controller2.doWorkOnSecondDeferred(deferred1, deferred2);
 
 	QTimer::singleShot(2000, [&]() {
 		p_controller1->deleteLater();

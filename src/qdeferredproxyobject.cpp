@@ -2,7 +2,7 @@
 
 QDeferredProxyObject::QDeferredProxyObject() : QObject(nullptr)
 {
-	
+	// nothing to do here
 }
 
 bool QDeferredProxyObject::event(QEvent * ev)

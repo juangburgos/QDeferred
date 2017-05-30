@@ -1,95 +1,106 @@
-#include "threadWorker.h"
+#include "threadworker.h"
 
 #include <QTimer>
 #include <QDebug>
 
+// THREADWORKEREVENT -------------------------------------------------
+
+ThreadWorkerEvent::ThreadWorkerEvent() : QEvent(QWORKERPROXY_EVENT_TYPE)
+{
+	// nothing to do here
+}
+
 // THREADWORKER -----------------------------------------------------
 
-void threadWorker::setDeferred1(QDefer deferred1)
+ThreadWorker::ThreadWorker() : QObject(nullptr)
 {
-	m_deferred1 = deferred1;
+
 }
 
-void threadWorker::setDeferred2(QDeferred<int, double> deferred2)
+bool ThreadWorker::event(QEvent * ev)
 {
-	m_deferred2 = deferred2;
+	if (ev->type() == QWORKERPROXY_EVENT_TYPE) {
+		// call function
+		static_cast<ThreadWorkerEvent*>(ev)->m_eventFunc();
+		// return event processed
+		return true;
+	}
+	// Call base implementation (make sure the rest of events are handled)
+	return QObject::event(ev);
 }
-
-void threadWorker::doWork1()
-{
-	// print id
-	auto p_thread = QThread::currentThread();
-	qDebug() << "[INFO] 1 thread id = " << p_thread;
-	// set done
-	m_deferred1.done([p_thread]() {
-		qDebug() << "[INFO] DEF1::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
-	});
-	m_deferred2.done([p_thread](int i, double d) {
-		Q_UNUSED(i)
-		Q_UNUSED(d)
-		qDebug() << "[INFO] DEF2::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
-	});
-	QDefer::when(m_deferred1, m_deferred2).done([p_thread]() {
-		qDebug() << "[INFO] WHEN::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
-	});
-	// set resolve timer
-	QTimer::singleShot(1000, [&]() {
-		qDebug() << "[INFO] DEF1::Resolved in 1 thread ********" << QThread::currentThread() << "********";
-		m_deferred1.resolve();
-	});
-}
-
-void threadWorker::doWork2()
-{
-	// print id
-	auto p_thread = QThread::currentThread();
-	qDebug() << "[INFO] 2 thread id = " << p_thread;
-	// set done
-	m_deferred2.done([p_thread](int i, double d) {
-		Q_UNUSED(i)
-		Q_UNUSED(d)
-		qDebug() << "[INFO] DEF2::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
-	});
-	m_deferred1.done([p_thread]() {
-		qDebug() << "[INFO] DEF1::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
-	});
-	QDefer::when(m_deferred1, m_deferred2).done([p_thread]() {
-		qDebug() << "[INFO] WHEN::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
-	});
-	// set resolve timer
-	QTimer::singleShot(1200, [&]() {
-		int    iNum = 666;
-		double dNum = 666.666;
-		qDebug() << "[INFO] DEF2::Resolved in 2 thread ********" << QThread::currentThread() << "********";
-		m_deferred2.resolve(iNum, dNum);
-	});
-}
-
 
 // THREADCONTROLLER -----------------------------------------------
 
-threadController::threadController()
+ThreadController::ThreadController()
 {
-	mp_worker = new threadWorker;
+	mp_worker = new ThreadWorker;
 	mp_worker->moveToThread(&m_workerThread);
-	connect(&m_workerThread, &QThread::finished         , mp_worker, &QObject::deleteLater);
-	connect(this           , &threadController::operate1, mp_worker, &threadWorker::doWork1);
-	connect(this           , &threadController::operate2, mp_worker, &threadWorker::doWork2);
+	connect(&m_workerThread, &QThread::finished, mp_worker, &QObject::deleteLater);
 	m_workerThread.start();
 }
 
-threadController::~threadController()
+ThreadController::~ThreadController()
 {
 	m_workerThread.quit();
 	m_workerThread.wait();
 }
 
-void threadController::setDeferred1(QDefer deferred1)
+void ThreadController::doWorkOnFirstDeferred(QDefer deferred1, QDeferred<int, double> deferred2)
 {
-	mp_worker->setDeferred1(deferred1);
+	ThreadWorkerEvent * p_Evt = new ThreadWorkerEvent;
+	p_Evt->m_eventFunc = [deferred1, deferred2]() mutable {
+		// print id
+		auto p_thread = QThread::currentThread();
+		qDebug() << "[INFO] 1 thread id = " << p_thread;
+		// set done
+		deferred1.done([p_thread]() {
+			qDebug() << "[INFO] DEF1::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
+		});
+		deferred2.done([p_thread](int i, double d) {
+			Q_UNUSED(i)
+			Q_UNUSED(d)
+			qDebug() << "[INFO] DEF2::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
+		});
+		QDefer::when(deferred1, deferred2).done([p_thread]() {
+			qDebug() << "[INFO] WHEN::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
+		});
+		// set resolve timer
+		QTimer::singleShot(1000, [deferred1]() mutable {
+			qDebug() << "[INFO] DEF1::Resolved in 1 thread ********" << QThread::currentThread() << "********";
+			deferred1.resolve();
+		});
+	};
+	// post event for object with correct thread affinity
+	QCoreApplication::postEvent(mp_worker, p_Evt);
 }
 
-void threadController::setDeferred2(QDeferred<int, double> deferred2)
+void ThreadController::doWorkOnSecondDeferred(QDefer deferred1, QDeferred<int, double> deferred2)
 {
-	mp_worker->setDeferred2(deferred2);
+	ThreadWorkerEvent * p_Evt = new ThreadWorkerEvent;
+	p_Evt->m_eventFunc = [deferred1, deferred2]() mutable {
+		// print id
+		auto p_thread = QThread::currentThread();
+		qDebug() << "[INFO] 2 thread id = " << p_thread;
+		// set done
+		deferred2.done([p_thread](int i, double d) {
+			Q_UNUSED(i)
+			Q_UNUSED(d)
+			qDebug() << "[INFO] DEF2::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
+		});
+		deferred1.done([p_thread]() {
+			qDebug() << "[INFO] DEF1::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
+		});
+		QDefer::when(deferred1, deferred2).done([p_thread]() {
+			qDebug() << "[INFO] WHEN::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
+		});
+		// set resolve timer
+		QTimer::singleShot(1200, [deferred2]() mutable {
+			int    iNum = 666;
+			double dNum = 666.666;
+			qDebug() << "[INFO] DEF2::Resolved in 2 thread ********" << QThread::currentThread() << "********";
+			deferred2.resolve(iNum, dNum);
+		});
+	};
+	// post event for object with correct thread affinity
+	QCoreApplication::postEvent(mp_worker, p_Evt);
 }

@@ -4,43 +4,47 @@
 #include <QThread>
 #include <QDeferred>
 
+#define QWORKERPROXY_EVENT_TYPE (QEvent::Type)(QEvent::User + 666)
+
+// THREADWORKEREVENT -------------------------------------------------
+
+class ThreadWorkerEvent : public QEvent
+{
+public:
+	explicit ThreadWorkerEvent();
+
+	std::function<void()> m_eventFunc;
+
+};
+
 // THREADWORKER -----------------------------------------------------
 
-class threadWorker : public QObject
+class ThreadWorker : public QObject
 {
 	Q_OBJECT
 public:
-	void setDeferred1(QDefer deferred1);
-	void setDeferred2(QDeferred<int, double> deferred2);
+	explicit ThreadWorker();
 
-public slots:
-	void doWork1();
-	void doWork2();
+	bool event(QEvent* ev);
 
-private:
-	QDefer                 m_deferred1;
-	QDeferred<int, double> m_deferred2;
 };
 
 // THREADCONTROLLER -----------------------------------------------
 
-class threadController : public QObject
+class ThreadController : public QObject
 {
 	Q_OBJECT
 public:
-	threadController();
-	~threadController();
+	ThreadController();
+	~ThreadController();
 
-	void setDeferred1(QDefer                 deferred1);
-	void setDeferred2(QDeferred<int, double> deferred2);
-
-signals:
-	void operate1();
-	void operate2();
+	void doWorkOnFirstDeferred(QDefer deferred1, QDeferred<int, double> deferred2);
+	void doWorkOnSecondDeferred(QDefer deferred1, QDeferred<int, double> deferred2);
 
 private:
 	QThread        m_workerThread;
-	threadWorker * mp_worker;
+	ThreadWorker * mp_worker;
+
 };
 
 #endif // THREAD_H
