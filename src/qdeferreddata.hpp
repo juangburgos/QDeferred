@@ -205,6 +205,7 @@ void QDeferredData<Types...>::then(std::function<void(Types(&...args))> callback
 template<class ...Types>
 void QDeferredData<Types...>::resolve(Types(&...args))
 {
+	m_mutex.lock();
 	// early exit if deferred has been already resolved or rejected
 	if (m_state != QDeferredState::PENDING)
 	{
@@ -239,11 +240,13 @@ void QDeferredData<Types...>::resolve(Types(&...args))
 		// post event for object with correct thread affinity
 		QCoreApplication::postEvent(p_currObject, p_Evt);
 	}	
+	m_mutex.unlock();
 }
 
 template<class ...Types>
 void QDeferredData<Types...>::reject(Types(&...args))
 {
+	m_mutex.lock();
 	// early exit if deferred has been already resolved or rejected
 	if (m_state != QDeferredState::PENDING)
 	{
@@ -278,6 +281,7 @@ void QDeferredData<Types...>::reject(Types(&...args))
 		// post event for object with correct thread affinity
 		QCoreApplication::postEvent(p_currObject, p_Evt);
 	}
+	m_mutex.unlock();
 }
 
 template<class ...Types>

@@ -35,7 +35,7 @@ ThreadController::ThreadController()
 {
 	mp_worker = new ThreadWorker;
 	mp_worker->moveToThread(&m_workerThread);
-	connect(&m_workerThread, &QThread::finished, mp_worker, &QObject::deleteLater);
+	QObject::connect(&m_workerThread, &QThread::finished, mp_worker, &QObject::deleteLater);
 	m_workerThread.start();
 }
 
@@ -47,6 +47,7 @@ ThreadController::~ThreadController()
 
 void ThreadController::doWorkOnFirstDeferred(QDefer deferred1, QDeferred<int, double> deferred2)
 {
+	// exec in thread
 	ThreadWorkerEvent * p_Evt = new ThreadWorkerEvent;
 	p_Evt->m_eventFunc = [deferred1, deferred2]() mutable {
 		// print id
@@ -76,6 +77,7 @@ void ThreadController::doWorkOnFirstDeferred(QDefer deferred1, QDeferred<int, do
 
 void ThreadController::doWorkOnSecondDeferred(QDefer deferred1, QDeferred<int, double> deferred2)
 {
+	// exec in thread
 	ThreadWorkerEvent * p_Evt = new ThreadWorkerEvent;
 	p_Evt->m_eventFunc = [deferred1, deferred2]() mutable {
 		// print id
@@ -103,4 +105,22 @@ void ThreadController::doWorkOnSecondDeferred(QDefer deferred1, QDeferred<int, d
 	};
 	// post event for object with correct thread affinity
 	QCoreApplication::postEvent(mp_worker, p_Evt);
+}
+
+QDeferred<int> ThreadController::doProgressWork(int delay)
+{
+	QDeferred<int> retDeferred;
+	// exec in thread
+	ThreadWorkerEvent * p_Evt = new ThreadWorkerEvent;
+	p_Evt->m_eventFunc = [retDeferred, delay]() mutable {
+		// set resolve timer
+		QTimer::singleShot(delay, [retDeferred]() mutable {
+			int iNum = 13;
+			retDeferred.resolve(iNum);
+		});
+	};
+	// post event for object with correct thread affinity
+	QCoreApplication::postEvent(mp_worker, p_Evt);
+	// return unresolved deferred
+	return retDeferred;
 }

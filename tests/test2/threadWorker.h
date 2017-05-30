@@ -31,9 +31,8 @@ public:
 
 // THREADCONTROLLER -----------------------------------------------
 
-class ThreadController : public QObject
+class ThreadController
 {
-	Q_OBJECT
 public:
 	ThreadController();
 	~ThreadController();
@@ -41,10 +40,11 @@ public:
 	void doWorkOnFirstDeferred(QDefer deferred1, QDeferred<int, double> deferred2);
 	void doWorkOnSecondDeferred(QDefer deferred1, QDeferred<int, double> deferred2);
 
+	QDeferred<int> doProgressWork(int delay);
+
 private:
 	QThread        m_workerThread;
 	ThreadWorker * mp_worker;
-
 };
 
 #endif // THREAD_H
