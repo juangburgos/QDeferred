@@ -42,20 +42,41 @@ ThreadController::~ThreadController()
 	m_workerThread.wait();
 }
 
-QDeferred<int> ThreadController::doProgressWork(int delay)
+QDeferred<int> ThreadController::doProgressWork(int delay, int max)
 {
 	QDeferred<int> retDeferred;
 	// exec in thread
 	ThreadWorkerEvent * p_Evt = new ThreadWorkerEvent;
-	p_Evt->m_eventFunc = [retDeferred, delay]() mutable {
+	p_Evt->m_eventFunc = [retDeferred, delay, max]() mutable {
+		qDebug() << "[INFO] Exec thread = " << QThread::currentThread();
 		// NOTE : the timer must exists in the heap
 		//        if exists on the stack will be deleted as soon as out of scope
 		//        and timeout will never be triggered
-		QTimer *timer = new QTimer(/*QThread::currentThread()*/);
-		QObject::connect(timer, &QTimer::timeout, [retDeferred]() mutable {
+		QTimer *timer = new QTimer();
+		// since timer is on heap, we must delete it eventually
+		QObject::connect(QThread::currentThread(), &QThread::finished, [timer]() {
+			timer->stop();
+			timer->deleteLater();
+			qDebug() << "[INFO] Finished timer... Hasta la vista baby!";
+			QThread::msleep(6000);
+		});
+		QObject::connect(timer, &QTimer::timeout, [retDeferred, max]() mutable {
 			static int counter = 0;
 			counter++;
-			retDeferred.notify(counter);
+			if (counter < max || (counter > max && counter <= 1.1*max))
+			{
+				qDebug() << "[INFO] Deferred notify with " << counter << " in thread = " << QThread::currentThread();
+				retDeferred.notify(counter);
+			} 
+			else if (counter == max)
+			{
+				qDebug() << "[INFO] Deferred reject with " << counter << " in thread = " << QThread::currentThread();
+				retDeferred.reject(counter);
+			}
+			else
+			{
+				QCoreApplication::quit();
+			}
 		});
 		timer->start(delay);
 	};

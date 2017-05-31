@@ -22,12 +22,16 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-	ThreadController controller;
+	qDebug() << "[INFO] Main thread = " << QThread::currentThread();
 
-	auto p_thread = QThread::currentThread();
-	controller.doProgressWork(1000).progress([p_thread](int num) {
-		//qDebug() << "[INFO] Progress callback defined in thread " << p_thread << ", exec in thread " << QThread::currentThread();
-		qDebug() << "[INFO] Progress callback result is " << num;
+	ThreadController controller;
+	// setup
+	controller.doProgressWork(100, 30).progress([](int num) {
+		qDebug() << "[INFO] Progress callback with " << num << " in thread = " << QThread::currentThread();
+	}).done([](int num) {
+		qDebug() << "[INFO] Done callback with  " << num << " in thread = " << QThread::currentThread();
+	}).fail([](int num) {
+		qDebug() << "[INFO] Fail callback with  " << num << " in thread = " << QThread::currentThread();
 	});
 	
     return a.exec();

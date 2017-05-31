@@ -34,7 +34,7 @@ public:
 	ThreadController();
 	~ThreadController();
 
-	QDeferred<int> doProgressWork(int delay);
+	QDeferred<int> doProgressWork(int delay, int max);
 
 private:
 	QThread        m_workerThread;
