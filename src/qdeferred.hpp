@@ -30,6 +30,8 @@ public:
 	QDeferred<Types...> fail(std::function<void(Types(&...args))> callback);
 	// then method
 	QDeferred<Types...> then(std::function<void(Types(&...args))> callback);
+	// progress method
+	QDeferred<Types...> progress(std::function<void(Types(&...args))> callback);
 
 	// extra consume API (static)
 
@@ -42,6 +44,8 @@ public:
 	void resolve(Types(&...args));
 	// reject method
 	void reject(Types(&...args));
+	// notify method
+	void notify(Types(&...args));
 
 protected:
 	QExplicitlySharedDataPointer<QDeferredData<Types...>> m_data;
@@ -124,6 +128,13 @@ QDeferred<Types...> QDeferred<Types...>::then(std::function<void(Types(&...args)
 }
 
 template<class ...Types>
+QDeferred<Types...> QDeferred<Types...>::progress(std::function<void(Types(&...args))> callback)
+{
+	m_data->progress(callback);
+	return *this;
+}
+
+template<class ...Types>
 void QDeferred<Types...>::resolve(Types(&...args))
 {
 	// pass reference to this to at least have 1 reference until callbacks get executed
@@ -135,6 +146,13 @@ void QDeferred<Types...>::reject(Types(&...args))
 {
 	// pass reference to this to at least have 1 reference until callbacks get executed
 	m_data->reject(*this, args...);
+}
+
+template<class ...Types>
+void QDeferred<Types...>::notify(Types(&...args))
+{
+	// pass reference to this to at least have 1 reference until callbacks get executed
+	m_data->notify(*this, args...);
 }
 
 template<class ...Types>

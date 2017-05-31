@@ -116,6 +116,7 @@ QDeferred<int> ThreadController::doProgressWork(int delay)
 		// set resolve timer
 		QTimer::singleShot(delay, [retDeferred]() mutable {
 			int iNum = 13;
+			qDebug() << "[INFO] DEF3::Resolved in 2 thread ********" << QThread::currentThread() << "********";
 			retDeferred.resolve(iNum);
 		});
 	};

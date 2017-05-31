@@ -80,6 +80,8 @@ public:
 	void fail(std::function<void(Types(&...args))> callback);
 	// then method
 	void then(std::function<void(Types(&...args))> callback);
+	// progress method
+	void progress(std::function<void(Types(&...args))> callback);
 
 	// TODO : implement progress()
 	// https://api.jquery.com/deferred.progress/
@@ -90,6 +92,8 @@ public:
 	void resolve(QDeferred<Types...> ref, Types(&...args));
 	// reject method
 	void reject(QDeferred<Types...> ref, Types(&...args));
+	// notify method
+	void notify(QDeferred<Types...> ref, Types(&...args));
 
 	// TODO : implement notify()
 	// https://api.jquery.com/deferred.notify/
@@ -117,6 +121,7 @@ private:
 		QList< std::function<void(Types(&...args))> > m_doneList;
 		QList< std::function<void(Types(&...args))> > m_failList;
 		QList< std::function<void(Types(&...args))> > m_thenList;
+		QList< std::function<void(Types(&...args))> > m_progressList;
 		QList< std::function<void()               > > m_doneZeroList;
 		QList< std::function<void()               > > m_failZeroList;
 	};
@@ -203,6 +208,15 @@ void QDeferredData<Types...>::then(std::function<void(Types(&...args))> callback
 }
 
 template<class ...Types>
+void QDeferredData<Types...>::progress(std::function<void(Types(&...args))> callback)
+{
+	// add object for thread if does not exists
+	auto p_callbacks = this->getCallbaksForThread();
+	// append to then callbacks list
+	p_callbacks->m_progressList.append(callback);
+}
+
+template<class ...Types>
 void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 {
 	m_mutex.lock();
@@ -229,8 +243,7 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 		auto p_currCallbacks  = m_callbacksMap[p_currThread];
 		// create object in heap and assign function (event loop takes ownership and deletes it later)
 		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [/* p_currThread, */ref, this, p_currCallbacks, args...]() mutable {
-			//qDebug() << "[INFO] Callback for thread " << p_currThread << " exec in thread " << QThread::currentThread();
+		p_Evt->m_eventFunc = [ref, this, p_currCallbacks, args...]() mutable {
 			// execute all done callbacks
 			this->execute(p_currCallbacks->m_doneList, args...); // DONE
 			// execute all then callbacks
@@ -272,8 +285,7 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 		auto p_currCallbacks = m_callbacksMap[p_currThread];
 		// create object in heap and assign function (event loop takes ownership and deletes it later)
 		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [/* p_currThread, */ref, this, p_currCallbacks, args...]() mutable {
-			//qDebug() << "[INFO] Callback for thread " << p_currThread << " exec in thread " << QThread::currentThread();
+		p_Evt->m_eventFunc = [ref, this, p_currCallbacks, args...]() mutable {
 			// execute all done callbacks
 			this->execute(p_currCallbacks->m_failList, args...); // FAIL
 			// execute all then callbacks
@@ -281,6 +293,38 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_failZeroList);  // FAIL
 			// unused, but we need it to keep at least one reference until all callbacks are executed
+			Q_UNUSED(ref)
+		};
+		// post event for object with correct thread affinity
+		QCoreApplication::postEvent(p_currObject, p_Evt);
+	}
+	m_mutex.unlock();
+}
+
+template<class ...Types>
+void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
+{
+	m_mutex.lock();
+	// early exit if deferred has been already resolved or rejected
+	if (m_state != QDeferredState::PENDING)
+	{
+		qWarning() << "Cannot notify already processed deferred object.";
+	}
+
+	// for each thread where there are callbacks to be called
+	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
+	while (i.hasNext())
+	{
+		i.next();
+		// set test function
+		auto p_currThread    = i.key();
+		auto p_currObject    = QDeferredDataBase::getObjectForThread(p_currThread);
+		auto p_currCallbacks = m_callbacksMap[p_currThread];
+		// create object in heap and assign function (event loop takes ownership and deletes it later)
+		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+		p_Evt->m_eventFunc = [ref, this, p_currCallbacks, args...]() mutable {
+			// execute all done callbacks
+			this->execute(p_currCallbacks->m_progressList, args...); // PROGRESS
 			Q_UNUSED(ref)
 		};
 		// post event for object with correct thread affinity

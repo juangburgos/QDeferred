@@ -1,0 +1,35 @@
+#include <QCoreApplication>
+#include <QTimer>
+#include <QDebug>
+
+#include <QList>
+#include <QVariant>
+
+#include "threadWorker.h"
+
+/*
+LAMBDA CAPTURE
+http://www.cprogramming.com/c++11/c++11-lambda-closures.html
+[]	        Capture nothing (or, a scorched earth strategy?)
+[&]	        Capture any referenced variable by reference
+[=]	        Capture any referenced variable by making a copy
+[=, &foo]	Capture any referenced variable by making a copy, but capture variable foo by reference
+[bar]	    Capture bar by making a copy; don't copy anything else
+[this]	    Capture the this pointer of the enclosing class
+*/
+
+int main(int argc, char *argv[])
+{
+    QCoreApplication a(argc, argv);
+
+	ThreadController controller;
+
+	auto p_thread = QThread::currentThread();
+	controller.doProgressWork(1000).progress([p_thread](int num) {
+		//qDebug() << "[INFO] Progress callback defined in thread " << p_thread << ", exec in thread " << QThread::currentThread();
+		qDebug() << "[INFO] Progress callback result is " << num;
+	});
+	
+    return a.exec();
+}
+
