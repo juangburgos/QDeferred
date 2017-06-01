@@ -140,6 +140,9 @@ template<class ...Types>
 QDeferredData<Types...>::QDeferredData()
 {
 	m_state = QDeferredState::PENDING;
+	// [DEBUG]
+	QDeferredDataBase::s_createCount++;
+	qDebug() << "[INFO++] Number of QDeferredData = " << QDeferredDataBase::s_createCount;
 }
 
 template<class ...Types>
@@ -147,6 +150,15 @@ QDeferredData<Types...>::~QDeferredData()
 {
 	// delete all memory allocated on heap
 	qDeleteAll(m_callbacksMap);
+	//QMapIterator<QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
+	//while (i.hasNext()) {
+	//	i.next();
+	//	delete i.value();
+	//}
+	// [DEBUG]
+	QDeferredDataBase::s_createCount--;
+	qDebug() << "[INFO--] Number of QDeferredData = " << QDeferredDataBase::s_createCount;
+	m_callbacksMap.clear();
 }
 
 template<class ...Types>
@@ -154,6 +166,7 @@ QDeferredData<Types...>::QDeferredData(const QDeferredData &other) : QSharedData
 m_whenCount(other.m_whenCount),
 m_callbacksMap(other.m_callbacksMap),
 m_state(other.m_state),
+m_mutex(other.m_mutex),
 m_finishedFunction(other.m_finishedFunction)
 {
 	// nothing to do here
@@ -173,6 +186,7 @@ void QDeferredData<Types...>::done(std::function<void(Types(&...args))> callback
 	// append to done callbacks list
 	p_callbacks->m_doneList.append(callback);
 	// call it inmediatly if already resolved
+	QMutexLocker locker(&m_mutex);
 	if (m_state == QDeferredState::RESOLVED)
 	{
 		m_finishedFunction(callback);
@@ -187,6 +201,7 @@ void QDeferredData<Types...>::fail(std::function<void(Types(&...args))> callback
 	// append to fail callbacks list
 	p_callbacks->m_failList.append(callback);
 	// call it inmediatly if already rejected
+	QMutexLocker locker(&m_mutex);
 	if (m_state == QDeferredState::REJECTED)
 	{
 		m_finishedFunction(callback);
@@ -201,6 +216,7 @@ void QDeferredData<Types...>::then(std::function<void(Types(&...args))> callback
 	// append to then callbacks list
 	p_callbacks->m_thenList.append(callback);
 	// call it inmediatly if already resolved or rejected
+	QMutexLocker locker(&m_mutex);
 	if (m_state == QDeferredState::RESOLVED || m_state == QDeferredState::REJECTED)
 	{
 		m_finishedFunction(callback);
@@ -219,11 +235,12 @@ void QDeferredData<Types...>::progress(std::function<void(Types(&...args))> call
 template<class ...Types>
 void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 {
-	m_mutex.lock();
+	QMutexLocker locker(&m_mutex);
 	// early exit if deferred has been already resolved or rejected
 	if (m_state != QDeferredState::PENDING)
 	{
 		qWarning() << "Cannot resolve already processed deferred object.";
+		return;
 	}
 	// change state
 	m_state = QDeferredState::RESOLVED;
@@ -256,17 +273,17 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 		// post event for object with correct thread affinity
 		QCoreApplication::postEvent(p_currObject, p_Evt);
 	}	
-	m_mutex.unlock();
 }
 
 template<class ...Types>
 void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 {
-	m_mutex.lock();
+	QMutexLocker locker(&m_mutex);
 	// early exit if deferred has been already resolved or rejected
 	if (m_state != QDeferredState::PENDING)
 	{
 		qWarning() << "Cannot reject already processed deferred object.";
+		return;
 	}
 	// change state
 	m_state = QDeferredState::REJECTED;
@@ -298,17 +315,17 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 		// post event for object with correct thread affinity
 		QCoreApplication::postEvent(p_currObject, p_Evt);
 	}
-	m_mutex.unlock();
 }
 
 template<class ...Types>
 void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 {
-	m_mutex.lock();
+	QMutexLocker locker(&m_mutex);
 	// early exit if deferred has been already resolved or rejected
 	if (m_state != QDeferredState::PENDING)
 	{
 		qWarning() << "Cannot notify already processed deferred object.";
+		return;
 	}
 
 	// for each thread where there are callbacks to be called
@@ -330,7 +347,6 @@ void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 		// post event for object with correct thread affinity
 		QCoreApplication::postEvent(p_currObject, p_Evt);
 	}
-	m_mutex.unlock();
 }
 
 template<class ...Types>
@@ -387,12 +403,15 @@ void QDeferredData<Types...>::executeZero(QList< std::function<void()> > &listCa
 template<class ...Types>
 typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>::getCallbaksForThread()
 {
-	m_mutex.lock();
+	QMutexLocker locker(&m_mutex);
 	// get current thread
 	QThread * p_currThd = QThread::currentThread();
 	// if not in list then...
 	if (!m_callbacksMap.contains(p_currThd))
 	{
+		// [BUG] MEMORY LEAK !!!
+		// https://stackoverflow.com/questions/14828678/disconnecting-lambda-functions-in-qt5
+		// maybe?
 		// get (or create new) object for thread
 		QDeferredProxyObject * p_obj = QDeferredDataBase::getObjectForThread(p_currThd);
 		// wait until object destroyed to remove callbacks struct
@@ -405,10 +424,10 @@ typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>
 				//qDebug() << "[INFO] Callbacks = " << p_callbacksToDel << " deleted.";
 			});			
 		});
+		// BELOW IS OK
 		// add callbacks struct to maps
 		m_callbacksMap[p_currThd] = new QDeferredData<Types...>::DeferredAllCallbacks;
 	}
-	m_mutex.unlock();
 	// return
 	return m_callbacksMap[p_currThd];
 }
