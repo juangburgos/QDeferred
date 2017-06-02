@@ -35,10 +35,6 @@ int main(int argc, char *argv[])
 		controller.doSomeWork(i).done(callback);	
 		// do not block event loop
 		QCoreApplication::processEvents();
-		// sleep a little
-		// [BUG] MEMORY LEAK requires no lambdas in QDeferredData<Types...>::getCallbaksForThread
-		//       AND at least a 1ms sleep (other thread's eventloop needs time to delete its events)
-		QThread::msleep(1);
 	}
 
     return a.exec();

@@ -4,7 +4,7 @@
 
 // define static members and methods of base class
 
-int    QDeferredDataBase::s_createCount = 0;
+//int    QDeferredDataBase::s_createCount = 0;
 
 QMutex QDeferredDataBase::s_mutex;
 

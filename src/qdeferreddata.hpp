@@ -44,7 +44,7 @@ protected:
 
 	static QDeferredProxyObject * getObjectForThread(QThread * p_currThd);
 
-	static int s_createCount;
+	//static int s_createCount;
 
 	static QMap< QThread *, QDeferredProxyObject * > s_threadMap;
 
@@ -130,6 +130,7 @@ private:
 	QMap< QThread *, DeferredAllCallbacks * > m_callbacksMap;
 	QDeferredState m_state;
 	QMutex         m_mutex;
+	QList<QMetaObject::Connection> m_connectionList;
 	// methods
 	void execute    (QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args));
 	void executeZero(QList< std::function<void()               > > &listCallbacks);
@@ -140,9 +141,9 @@ template<class ...Types>
 QDeferredData<Types...>::QDeferredData()
 {
 	m_state = QDeferredState::PENDING;
-	// [DEBUG]
-	QDeferredDataBase::s_createCount++;
-	qDebug() << "[INFO++] Number of QDeferredData = " << QDeferredDataBase::s_createCount;
+	//// [DEBUG]
+	//QDeferredDataBase::s_createCount++;
+	//qDebug() << "[INFO++] Number of QDeferredData = " << QDeferredDataBase::s_createCount;
 }
 
 template<class ...Types>
@@ -150,15 +151,15 @@ QDeferredData<Types...>::~QDeferredData()
 {
 	// delete all memory allocated on heap
 	qDeleteAll(m_callbacksMap);
-	//QMapIterator<QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
-	//while (i.hasNext()) {
-	//	i.next();
-	//	delete i.value();
-	//}
-	// [DEBUG]
-	QDeferredDataBase::s_createCount--;
-	qDebug() << "[INFO--] Number of QDeferredData = " << QDeferredDataBase::s_createCount;
+	// remove connections
+	for (int i = 0; i < m_connectionList.count(); i++)
+	{
+		QObject::disconnect(m_connectionList[i]);
+	}
 	m_callbacksMap.clear();
+	//// [DEBUG]
+	//QDeferredDataBase::s_createCount--;
+	//qDebug() << "[INFO--] Number of QDeferredData = " << QDeferredDataBase::s_createCount;
 }
 
 template<class ...Types>
@@ -167,6 +168,7 @@ m_whenCount(other.m_whenCount),
 m_callbacksMap(other.m_callbacksMap),
 m_state(other.m_state),
 m_mutex(other.m_mutex),
+m_connectionList(other.m_connectionList),
 m_finishedFunction(other.m_finishedFunction)
 {
 	// nothing to do here
@@ -409,25 +411,22 @@ typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>
 	// if not in list then...
 	if (!m_callbacksMap.contains(p_currThd))
 	{
-		// [BUG] MEMORY LEAK !!!
-		// https://stackoverflow.com/questions/14828678/disconnecting-lambda-functions-in-qt5
-		// maybe?
-		// get (or create new) object for thread
 		QDeferredProxyObject * p_obj = QDeferredDataBase::getObjectForThread(p_currThd);
 		// wait until object destroyed to remove callbacks struct
-		QObject::connect(p_obj, &QObject::destroyed, [&, p_currThd]() {
+		// NOTE : need to disconnect these connections to avoid memory leaks due to lambda memory allocations
+		m_connectionList.append(QObject::connect(p_obj, &QObject::destroyed, [&, p_currThd]() {
 			// delete callbacks when thread gets deleted
 			auto p_callbacksToDel = m_callbacksMap.take(p_currThd);
+			// NOTE : m_connectionList.append not necessary here because conneciton will auto delete when p_currThd gets deleted
 			QObject::connect(p_currThd, &QObject::destroyed, [p_callbacksToDel]() {
 				delete p_callbacksToDel;
 				//// [DEBUG]
 				//qDebug() << "[INFO] Callbacks = " << p_callbacksToDel << " deleted.";
 			});			
-		});
-		// BELOW IS OK
+		}));
 		// add callbacks struct to maps
 		m_callbacksMap[p_currThd] = new QDeferredData<Types...>::DeferredAllCallbacks;
-	}
+	};
 	// return
 	return m_callbacksMap[p_currThd];
 }
