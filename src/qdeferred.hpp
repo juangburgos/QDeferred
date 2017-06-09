@@ -33,6 +33,18 @@ public:
 	// progress method
 	QDeferred<Types...> progress(std::function<void(Types(&...args))> callback);
 
+	// wrapper consumer visual studio debug API (native visualizations)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+	// debug done method	
+	QDeferred<Types...> doneVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
+	// debug fail method
+	QDeferred<Types...> failVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
+	// debug then method
+	QDeferred<Types...> thenVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
+	// debug progress method
+	QDeferred<Types...> progressVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
+#endif
+
 	// extra consume API (static)
 
 	template <class ...OtherTypes, typename... Rest>
@@ -46,6 +58,16 @@ public:
 	void reject(Types(&...args));
 	// notify method
 	void notify(Types(&...args));
+
+	// wrapper provider visual studio debug API (native visualizations)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+	// debug resolve method
+	void resolveVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, Types(&...args));
+	// debug reject method
+	void rejectVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, Types(&...args));
+	// debug notify method
+	void notifyVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, Types(&...args));
+#endif
 
 protected:
 	QExplicitlySharedDataPointer<QDeferredData<Types...>> m_data;
@@ -66,7 +88,26 @@ private:
 	void doneZero(std::function<void()> callback);
 	// fail method with zero arguments
 	void failZero(std::function<void()> callback);
+
+	// debug helpers
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+	QString createVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd);
+#endif
 };
+
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+template<class ...Types>
+inline QString QDeferred<Types...>::createVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd)
+{
+	// get thread address
+	std::stringstream stream;
+	stream << std::hex << (size_t)thnd;
+
+	// TODO : clean lambda function name
+
+	return QString("File %1, Function %2, Line %3, Thread %4").arg(file).arg(function).arg(line).arg(QString::fromStdString(stream.str()));
+}
+#endif
 
 // alias for no argument types
 using QDefer = QDeferred<>;
@@ -134,6 +175,44 @@ QDeferred<Types...> QDeferred<Types...>::progress(std::function<void(Types(&...a
 	return *this;
 }
 
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+template<class ...Types>
+QDeferred<Types...> QDeferred<Types...>::doneVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
+{
+	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
+	qDebug() << "[DEBUG] doneVsDbg_Impl " << strDbgInfo;
+	// TODO
+	return this->done(callback);
+}
+
+template<class ...Types>
+QDeferred<Types...> QDeferred<Types...>::failVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
+{
+	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
+	qDebug() << "[DEBUG] failVsDbg_Impl " << strDbgInfo;
+	// TODO
+	return this->fail(callback);
+}
+
+template<class ...Types>
+QDeferred<Types...> QDeferred<Types...>::thenVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
+{
+	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
+	qDebug() << "[DEBUG] thenVsDbg_Impl " << strDbgInfo;
+	// TODO
+	return this->then(callback);
+}
+
+template<class ...Types>
+QDeferred<Types...> QDeferred<Types...>::progressVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
+{
+	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
+	qDebug() << "[DEBUG] progressVsDbg_Impl " << strDbgInfo;
+	// TODO
+	return this->progress(callback);
+}
+#endif // defined(QT_DEBUG) && defined(Q_OS_WIN)
+
 template<class ...Types>
 void QDeferred<Types...>::resolve(Types(&...args))
 {
@@ -154,6 +233,37 @@ void QDeferred<Types...>::notify(Types(&...args))
 	// pass reference to this to at least have 1 reference until callbacks get executed
 	m_data->notify(*this, args...);
 }
+
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#include <sstream>
+
+template<class ...Types>
+void QDeferred<Types...>::resolveVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, Types(&...args))
+{
+	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
+	qDebug() << "[DEBUG] resolveVsDbg_Impl " << strDbgInfo;
+	// TODO
+	this->resolve(args...);
+}
+
+template<class ...Types>
+void QDeferred<Types...>::rejectVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, Types(&...args))
+{
+	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
+	qDebug() << "[DEBUG] rejectVsDbg_Impl " << strDbgInfo;
+	// TODO
+	this->reject(args...);
+}
+
+template<class ...Types>
+void QDeferred<Types...>::notifyVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, Types(&...args))
+{
+	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
+	qDebug() << "[DEBUG] notifyVsDbg_Impl " << strDbgInfo;
+	// TODO
+	this->notify(args...);
+}
+#endif // defined(QT_DEBUG) && defined(Q_OS_WIN)
 
 template<class ...Types>
 void QDeferred<Types...>::doneZero(std::function<void()> callback)
@@ -211,5 +321,23 @@ int QDeferred<Types...>::getWhenCount()
 {
 	return m_data->m_whenCount;
 }
+
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#define doneVsDbg(...)     doneVsDbg_Impl    (__FILE__,__FUNCTION__,__LINE__, QThread::currentThread(), __VA_ARGS__)
+#define failVsDbg(...)     failVsDbg_Impl    (__FILE__,__FUNCTION__,__LINE__, QThread::currentThread(), __VA_ARGS__)
+#define thenVsDbg(...)     thenVsDbg_Impl    (__FILE__,__FUNCTION__,__LINE__, QThread::currentThread(), __VA_ARGS__)
+#define progressVsDbg(...) progressVsDbg_Impl(__FILE__,__FUNCTION__,__LINE__, QThread::currentThread(), __VA_ARGS__)
+#define resolveVsDbg(...)  resolveVsDbg_Impl (__FILE__,__FUNCTION__,__LINE__, QThread::currentThread(), __VA_ARGS__)
+#define rejectVsDbg(...)   rejectVsDbg_Impl  (__FILE__,__FUNCTION__,__LINE__, QThread::currentThread(), __VA_ARGS__)
+#define notifyVsDbg(...)   notifyVsDbg_Impl  (__FILE__,__FUNCTION__,__LINE__, QThread::currentThread(), __VA_ARGS__)
+#else
+#define doneVsDbg(...)     done(__VA_ARGS__)    
+#define failVsDbg(...)     fail(__VA_ARGS__)    
+#define thenVsDbg(...)     then(__VA_ARGS__)    
+#define progressVsDbg(...) progress(__VA_ARGS__)
+#define resolveVsDbg(...)  resolve(__VA_ARGS__) 
+#define rejectVsDbg(...)   reject(__VA_ARGS__)  
+#define notifyVsDbg(...)   notify(__VA_ARGS__)  
+#endif
 
 #endif // QDEFERRED_H

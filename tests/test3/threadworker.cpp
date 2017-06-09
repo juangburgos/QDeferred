@@ -66,12 +66,12 @@ QDeferred<int> ThreadController::doProgressWork(int delay, int max)
 			if (counter < max || (counter > max && counter <= 1.1*max))
 			{
 				qDebug() << "[INFO] Deferred notify with " << counter << " in thread = " << QThread::currentThread();
-				retDeferred.notify(counter);
+				retDeferred.notifyVsDbg(counter);
 			} 
 			else if (counter == max)
 			{
 				qDebug() << "[INFO] Deferred reject with " << counter << " in thread = " << QThread::currentThread();
-				retDeferred.reject(counter);
+				retDeferred.rejectVsDbg(counter);
 			}
 			else
 			{

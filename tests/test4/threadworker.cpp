@@ -48,7 +48,7 @@ QDeferred<int> ThreadController::doSomeWork(int num)
 	// exec in thread
 	ThreadWorkerEvent * p_Evt = new ThreadWorkerEvent;
 	p_Evt->m_eventFunc = [retDeferred, num]() mutable {
-		retDeferred.resolve(num);
+		retDeferred.resolveVsDbg(num);
 	};
 	// post event for object with correct thread affinity
 	QCoreApplication::postEvent(mp_worker, p_Evt);

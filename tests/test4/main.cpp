@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < 1000000; i++)
 	{
 		// setup
-		controller.doSomeWork(i).done(callback);	
+		controller.doSomeWork(i).doneVsDbg(callback);	
 		// do not block event loop
 		QCoreApplication::processEvents();
 	}
