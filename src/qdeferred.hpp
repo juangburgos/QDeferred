@@ -89,7 +89,7 @@ private:
 	// fail method with zero arguments
 	void failZero(std::function<void()> callback);
 
-	// debug helpers
+	// debug helpers for visual studio debug API (native visualizations)
 #if defined(QT_DEBUG) && defined(Q_OS_WIN)
 	QString createVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd);
 #endif
@@ -102,10 +102,16 @@ inline QString QDeferred<Types...>::createVsDbg_Impl(const char *file, const cha
 	// get thread address
 	std::stringstream stream;
 	stream << std::hex << (size_t)thnd;
-
-	// TODO : clean lambda function name
-
-	return QString("File %1, Function %2, Line %3, Thread %4").arg(file).arg(function).arg(line).arg(QString::fromStdString(stream.str()));
+	// clean lambda function name
+	QString strFunc = QString("%1").arg(function);
+	if (strFunc.contains("lambda_"))
+	{
+		//QString &QString::remove(int position, int n)
+		int iPos = strFunc.indexOf("lambda_") + 6;
+		int iN   = strFunc.indexOf(">") - iPos;
+		strFunc  = strFunc.remove(iPos, iN);
+	}
+	return QString("File: %1, Func: %2, Line: %3, Thd: %4").arg(file).arg(strFunc).arg(line).arg(QString::fromStdString(stream.str()));
 }
 #endif
 
@@ -180,36 +186,36 @@ template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::doneVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
 {
 	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
-	qDebug() << "[DEBUG] doneVsDbg_Impl " << strDbgInfo;
-	// TODO
-	return this->done(callback);
+	// call debug version
+	m_data->doneVsDbg_Impl(strDbgInfo, callback);
+	return *this;
 }
 
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::failVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
 {
 	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
-	qDebug() << "[DEBUG] failVsDbg_Impl " << strDbgInfo;
-	// TODO
-	return this->fail(callback);
+	// call debug version
+	m_data->failVsDbg_Impl(strDbgInfo, callback);
+	return *this;
 }
 
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::thenVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
 {
 	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
-	qDebug() << "[DEBUG] thenVsDbg_Impl " << strDbgInfo;
-	// TODO
-	return this->then(callback);
+	// call debug version
+	m_data->thenVsDbg_Impl(strDbgInfo, callback);
+	return *this;
 }
 
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::progressVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
 {
 	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
-	qDebug() << "[DEBUG] progressVsDbg_Impl " << strDbgInfo;
-	// TODO
-	return this->progress(callback);
+	// call debug version
+	m_data->progressVsDbg_Impl(strDbgInfo, callback);
+	return *this;
 }
 #endif // defined(QT_DEBUG) && defined(Q_OS_WIN)
 
@@ -241,27 +247,24 @@ template<class ...Types>
 void QDeferred<Types...>::resolveVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, Types(&...args))
 {
 	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
-	qDebug() << "[DEBUG] resolveVsDbg_Impl " << strDbgInfo;
-	// TODO
-	this->resolve(args...);
+	// call debug version
+	m_data->resolveVsDbg_Impl(strDbgInfo, *this, args...);
 }
 
 template<class ...Types>
 void QDeferred<Types...>::rejectVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, Types(&...args))
 {
 	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
-	qDebug() << "[DEBUG] rejectVsDbg_Impl " << strDbgInfo;
-	// TODO
-	this->reject(args...);
+	// call debug version
+	m_data->rejectVsDbg_Impl(strDbgInfo, *this, args...);
 }
 
 template<class ...Types>
 void QDeferred<Types...>::notifyVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, Types(&...args))
 {
 	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
-	qDebug() << "[DEBUG] notifyVsDbg_Impl " << strDbgInfo;
-	// TODO
-	this->notify(args...);
+	// call debug version
+	m_data->notifyVsDbg_Impl(strDbgInfo, *this, args...);
 }
 #endif // defined(QT_DEBUG) && defined(Q_OS_WIN)
 

@@ -33,7 +33,7 @@ void testShared(QDeferred<int, double> def)
 {
 	qDebug() << "[INFO] Called testShared ";
 	// setup deferred 3
-	def.done([=](int i, double d) {
+	def.doneVsDbg([=](int i, double d) {
 		// print args
 		qDebug() << "[DEF3] testShared i = " << i << ".";
 		qDebug() << "[DEF3] testShared d = " << d << ".";
@@ -51,20 +51,20 @@ int main(int argc, char *argv[])
 	QDefer deferred5;
 
 	QDefer::when(deferred1, deferred4, deferred5)
-	  .done([]() {
+	  .doneVsDbg([]() {
 		qDebug() << "[INFO] First when has done.";
-	}).fail([]() {
+	}).failVsDbg([]() {
 		qDebug() << "[INFO] First when has failed.";
-	}).then([]() {
+	}).thenVsDbg([]() {
 		qDebug() << "[INFO] First when has thened.";
 	});
 
 	QDefer::when(deferred2, deferred3, deferred4)
-	  .done([]() {
+	  .doneVsDbg([]() {
 		qDebug() << "[INFO] Second when has done.";
-	}).fail([]() {
+	}).failVsDbg([]() {
 		qDebug() << "[INFO] Second when has failed.";
-	}).then([]() {
+	}).thenVsDbg([]() {
 		qDebug() << "[INFO] Second when has thenned.";
 	});
 
@@ -75,36 +75,36 @@ int main(int argc, char *argv[])
 	qDebug() << "[INFO] deferred5.state() = " << deferred5.state();
 
 	// setup deferred 1
-	deferred1.done([=](QList<QVariant> listArgs) {
+	deferred1.doneVsDbg([=](QList<QVariant> listArgs) {
 		// print args
 		for (int i = 0; i < listArgs.length(); i++)
 		{
 			qDebug() << "[DEF1] Argument " << i << " = " << listArgs.at(i) << ".";
 		}
-	}).done([=](QList<QVariant> listArgs) {
+	}).doneVsDbg([=](QList<QVariant> listArgs) {
 		// print finished
 		qDebug() << "[DEF1] Resolved.";
 	});
 
 	// setup deferred 2
-	deferred2.fail([=](QList<QVariant> listArgs, QString strMessage) {
+	deferred2.failVsDbg([=](QList<QVariant> listArgs, QString strMessage) {
 		// print args
 		for (int i = 0; i < listArgs.length(); i++)
 		{
 			qDebug() << "[DEF2] Argument " << i << " = " << listArgs.at(i) << ".";
 		}
 		qDebug() << "[DEF2] Message " << strMessage << ".";
-	}).fail([=](QList<QVariant> listArgs, QString strMessage) {
+	}).failVsDbg([=](QList<QVariant> listArgs, QString strMessage) {
 		// print finished
 		qDebug() << "[DEF2] Failed.";
 	});
 
 	// setup deferred 3
-	deferred3.done([=](int i, double d) {
+	deferred3.doneVsDbg([=](int i, double d) {
 		// print args
 		qDebug() << "[DEF3] Argument i = " << i << ".";
 		qDebug() << "[DEF3] Argument d = " << d << ".";
-	}).done([=](int i, double d) {
+	}).doneVsDbg([=](int i, double d) {
 		Q_UNUSED(i)
 		Q_UNUSED(d)
 		// print finished
@@ -114,13 +114,13 @@ int main(int argc, char *argv[])
 	testShared(deferred3);
 
 	// setup deferred 4
-	deferred4.done([=]() {
+	deferred4.doneVsDbg([=]() {
 		// print finished
 		qDebug() << "[DEF4] Resolved.";
 	});
 
 	// setup deferred 5
-	deferred5.then([=]() {
+	deferred5.thenVsDbg([=]() {
 		// print finished
 		qDebug() << "[DEF5] Thenned.";
 	});
@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
 		listArgs.append("World");
 		listArgs.append(12345);
 		// resolve
-		deferred1.resolve(listArgs);
+		deferred1.resolveVsDbg(listArgs);
 		qDebug() << "[INFO] deferred1.state() = " << deferred1.state();
 	});
 
@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
 		listArgs.append(6789);
 		// reject
 		QString strMessage("Que dices?");
-		deferred2.reject(listArgs, strMessage);
+		deferred2.rejectVsDbg(listArgs, strMessage);
 		qDebug() << "[INFO] deferred2.state() = " << deferred2.state();
 	});
 
@@ -162,10 +162,10 @@ int main(int argc, char *argv[])
 		// resolve
 		int    iNum = 666;
 		double dNum = 666.666;
-		deferred3.resolve(iNum, dNum);
+		deferred3.resolveVsDbg(iNum, dNum);
 		qDebug() << "[INFO] deferred3.state() = " << deferred3.state();
 		// call done again
-		deferred3.done([=](int i, double d) {
+		deferred3.doneVsDbg([=](int i, double d) {
 			// print args
 			qDebug() << "[DEF3] After done i = " << i << ".";
 			qDebug() << "[DEF3] After done d = " << d << ".";
@@ -175,16 +175,16 @@ int main(int argc, char *argv[])
 	// asynch resolve of deferred 4
 	QTimer::singleShot(1000, [&]() {
 		// resolve
-		deferred4.resolve();
+		deferred4.resolveVsDbg();
 		qDebug() << "[INFO] deferred4.state() = " << deferred4.state();
 	});
 
 	// asynch resolve of deferred 5
 	QTimer::singleShot(1500, [&]() {
 		// resolve
-		deferred5.resolve();
+		deferred5.resolveVsDbg();
 		qDebug() << "[INFO] deferred5.state() = " << deferred5.state();
-		deferred5.done([=]() {
+		deferred5.doneVsDbg([=]() {
 			// print finished
 			qDebug() << "[DEF5] After done.";
 		});

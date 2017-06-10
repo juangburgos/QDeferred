@@ -44,8 +44,6 @@ protected:
 
 	static QDeferredProxyObject * getObjectForThread(QThread * p_currThd);
 
-	//static int s_createCount;
-
 	static QMap< QThread *, QDeferredProxyObject * > s_threadMap;
 
 	static QMutex s_mutex;
@@ -83,8 +81,17 @@ public:
 	// progress method
 	void progress(std::function<void(Types(&...args))> callback);
 
-	// TODO : implement progress()
-	// https://api.jquery.com/deferred.progress/
+	// consumer visual studio debug API (native visualizations)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+	// debug done method	
+	void doneVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback);
+	// debug fail method
+	void failVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback);
+	// debug then method
+	void thenVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback);
+	// debug progress method
+	void progressVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback);
+#endif
 
 	// provider API
 
@@ -95,8 +102,15 @@ public:
 	// notify method
 	void notify(QDeferred<Types...> ref, Types(&...args));
 
-	// TODO : implement notify()
-	// https://api.jquery.com/deferred.notify/
+	// provider visual studio debug API (native visualizations)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+	// debug resolve method
+	void resolveVsDbg_Impl(QString &strVsDbg, QDeferred<Types...> ref, Types(&...args));
+	// debug reject method
+	void rejectVsDbg_Impl(QString &strVsDbg, QDeferred<Types...> ref, Types(&...args));
+	// debug notify method
+	void notifyVsDbg_Impl(QString &strVsDbg, QDeferred<Types...> ref, Types(&...args));
+#endif
 
 	// internal API
 
@@ -109,14 +123,7 @@ public:
 	int m_whenCount = 0;
 
 private:
-
-	/*
-	In summary, one QDeferredProxyObject per thread globally
-	Now per deferred, one DeferredAllCallbacks per QDeferredProxyObject
-	If thread is finished or exited, QDeferredProxyObject is deleted and
-	If QDeferredProxyObject is deleted, related DeferredAllCallbacks are
-	deleted across all deferred instances.
-	*/
+	// structure to contain callbacks (one instance per thread in m_callbacksMap)
 	struct DeferredAllCallbacks {
 		QList< std::function<void(Types(&...args))> > m_doneList;
 		QList< std::function<void(Types(&...args))> > m_failList;
@@ -135,15 +142,28 @@ private:
 	void execute    (QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args));
 	void executeZero(QList< std::function<void()               > > &listCallbacks);
 	DeferredAllCallbacks * getCallbaksForThread();
+
+	// debug helpers for visual studio debug API (native visualizations)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+	std::string d_state;
+	std::vector<std::string> d_vecDoneList;
+	std::vector<std::string> d_vecFailList;
+	std::vector<std::string> d_vecThenList;
+	std::vector<std::string> d_vecProgressList;
+	std::vector<std::string> d_vecResolveList;
+	std::vector<std::string> d_vecRejectList;
+	std::vector<std::string> d_vecNotifyList;
+#endif
+
 };
 
 template<class ...Types>
 QDeferredData<Types...>::QDeferredData()
 {
 	m_state = QDeferredState::PENDING;
-	//// [DEBUG]
-	//QDeferredDataBase::s_createCount++;
-	//qDebug() << "[INFO++] Number of QDeferredData = " << QDeferredDataBase::s_createCount;
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+	d_state = "PENDING";
+#endif
 }
 
 template<class ...Types>
@@ -157,9 +177,6 @@ QDeferredData<Types...>::~QDeferredData()
 		QObject::disconnect(m_connectionList[i]);
 	}
 	m_callbacksMap.clear();
-	//// [DEBUG]
-	//QDeferredDataBase::s_createCount--;
-	//qDebug() << "[INFO--] Number of QDeferredData = " << QDeferredDataBase::s_createCount;
 }
 
 template<class ...Types>
@@ -234,6 +251,44 @@ void QDeferredData<Types...>::progress(std::function<void(Types(&...args))> call
 	p_callbacks->m_progressList.append(callback);
 }
 
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+template<class ...Types>
+void QDeferredData<Types...>::doneVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback)
+{
+	// store
+	d_vecDoneList.push_back(strVsDbg.toStdString());
+	// call original
+	this->done(callback);
+}
+
+template<class ...Types>
+void QDeferredData<Types...>::failVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback)
+{
+	// store
+	d_vecFailList.push_back(strVsDbg.toStdString());
+	// call original
+	this->fail(callback);
+}
+
+template<class ...Types>
+void QDeferredData<Types...>::thenVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback)
+{
+	// store
+	d_vecThenList.push_back(strVsDbg.toStdString());
+	// call original
+	this->done(callback);
+}
+
+template<class ...Types>
+void QDeferredData<Types...>::progressVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback)
+{
+	// store
+	d_vecProgressList.push_back(strVsDbg.toStdString());
+	// call original
+	this->progress(callback);
+}
+#endif // defined(QT_DEBUG) && defined(Q_OS_WIN)
+
 template<class ...Types>
 void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 {
@@ -246,6 +301,9 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 	}
 	// change state
 	m_state = QDeferredState::RESOLVED;
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+	d_state = "RESOLVED";
+#endif
 	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after resolve)
 	m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
 		callback(args...);
@@ -289,6 +347,9 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 	}
 	// change state
 	m_state = QDeferredState::REJECTED;
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+	d_state = "REJECTED";
+#endif
 	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after reject)
 	m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
 		callback(args...);
@@ -329,7 +390,6 @@ void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 		qWarning() << "Cannot notify already processed deferred object.";
 		return;
 	}
-
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
 	while (i.hasNext())
@@ -350,6 +410,35 @@ void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 		QCoreApplication::postEvent(p_currObject, p_Evt);
 	}
 }
+
+#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+template<class ...Types>
+void QDeferredData<Types...>::resolveVsDbg_Impl(QString &strVsDbg, QDeferred<Types...> ref, Types(&...args))
+{
+	// store
+	d_vecResolveList.push_back(strVsDbg.toStdString());
+	// call original
+	this->resolve(ref, args...);
+}
+
+template<class ...Types>
+void QDeferredData<Types...>::rejectVsDbg_Impl(QString &strVsDbg, QDeferred<Types...> ref, Types(&...args))
+{
+	// store
+	d_vecRejectList.push_back(strVsDbg.toStdString());
+	// call original
+	this->reject(ref, args...);
+}
+
+template<class ...Types>
+void QDeferredData<Types...>::notifyVsDbg_Impl(QString &strVsDbg, QDeferred<Types...> ref, Types(&...args))
+{
+	// store
+	d_vecNotifyList.push_back(strVsDbg.toStdString());
+	// call original
+	this->notify(ref, args...);
+}
+#endif // defined(QT_DEBUG) && defined(Q_OS_WIN)
 
 template<class ...Types>
 void QDeferredData<Types...>::execute(QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args))
@@ -420,8 +509,6 @@ typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>
 			// NOTE : m_connectionList.append not necessary here because conneciton will auto delete when p_currThd gets deleted
 			QObject::connect(p_currThd, &QObject::destroyed, [p_callbacksToDel]() {
 				delete p_callbacksToDel;
-				//// [DEBUG]
-				//qDebug() << "[INFO] Callbacks = " << p_callbacksToDel << " deleted.";
 			});			
 		}));
 		// add callbacks struct to maps

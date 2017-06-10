@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <Type Name="QDeferred&lt;*&gt;">
+    <AlternativeType Name="QDeferred&lt;*&gt;"/>
+    <DisplayString>Deferred Object</DisplayString>
+    <Expand>
+      <Synthetic Name="State">
+        <DisplayString>{m_data.d-&gt;d_state}</DisplayString>
+      </Synthetic>
+      <Item Name="Done Callbacks">m_data.d-&gt;d_vecDoneList</Item>
+      <Item Name="Fail Callbacks">m_data.d-&gt;d_vecFailList</Item>
+      <Item Name="Then Callbacks">m_data.d-&gt;d_vecThenList</Item>
+      <Item Name="Progress Callbacks">m_data.d-&gt;d_vecProgressList</Item>
+      <Item Name="Resolve Call">m_data.d-&gt;d_vecResolveList</Item>
+      <Item Name="Reject Call">m_data.d-&gt;d_vecRejectList</Item>
+      <Item Name="Notify Calls">m_data.d-&gt;d_vecNotifyList</Item>
+    </Expand> 
+  </Type>
+
+  <Type Name="QDeferred&lt;&gt;">
+    <AlternativeType Name="QDeferred&lt;&gt;"/>
+    <DisplayString>Deferred Object</DisplayString>
+    <Expand>
+      <Synthetic Name="State">
+        <DisplayString>{m_data.d-&gt;d_state}</DisplayString>
+      </Synthetic>
+      <Item Name="Done Callbacks">m_data.d-&gt;d_vecDoneList</Item>
+      <Item Name="Fail Callbacks">m_data.d-&gt;d_vecFailList</Item>
+      <Item Name="Then Callbacks">m_data.d-&gt;d_vecThenList</Item>
+      <Item Name="Progress Callbacks">m_data.d-&gt;d_vecProgressList</Item>
+      <Item Name="Resolve Call">m_data.d-&gt;d_vecResolveList</Item>
+      <Item Name="Reject Call">m_data.d-&gt;d_vecRejectList</Item>
+      <Item Name="Notify Calls">m_data.d-&gt;d_vecNotifyList</Item>
+    </Expand>
+  </Type>
+
+</AutoVisualizer>
