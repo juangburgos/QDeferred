@@ -1,5 +1,5 @@
-#ifndef QDEFTHREADWORKER_H
-#define QDEFTHREADWORKER_H
+#ifndef QLAMBDATHREADWORKER_H
+#define QLAMBDATHREADWORKER_H
 
 #include <QExplicitlySharedDataPointer>
 #include "qlambdathreadworkerdata.h"
@@ -22,4 +22,4 @@ protected:
 
 };
 
-#endif // QDEFTHREADWORKER_H
+#endif // QLAMBDATHREADWORKER_H

@@ -8,8 +8,30 @@
 #include <QMutex>
 #include <QMap>
 #include <functional>
+#include <QObject>
+#include <QEvent>
 
-#include "qdeferredproxyobject.h"
+// custom event to be used in qt event loop for each thread
+#define QDEFERREDPROXY_EVENT_TYPE (QEvent::Type)(QEvent::User + 123)
+
+class QDeferredProxyObject : public QObject
+{
+	Q_OBJECT
+public:
+	explicit QDeferredProxyObject();
+
+	bool event(QEvent* ev);
+
+};
+
+class QDeferredProxyEvent : public QEvent
+{
+public:
+	explicit QDeferredProxyEvent();
+
+	std::function<void()> m_eventFunc;
+
+};
 
 // forward declaration to be able to make friend
 template<class ...Types>

@@ -1,5 +1,5 @@
-#ifndef QDEFTHREADWORKERDATA_H
-#define QDEFTHREADWORKERDATA_H
+#ifndef QQLAMBDATHREADWORKERDATA_H
+#define QQLAMBDATHREADWORKERDATA_H
 
 #include <QThread>
 #include <QObject>
@@ -43,9 +43,9 @@ public:
 	QString getThreadId();
 	
 private:
-	QThread                    * mp_workerThread;
+	QThread                       * mp_workerThread;
 	QLambdaThreadWorkerObjectData * mp_workerObj;
-	QString                      m_strThreadId;
+	QString                         m_strThreadId;
 };
 
-#endif // QDEFTHREADWORKERDATA_H
+#endif // QQLAMBDATHREADWORKERDATA_H
