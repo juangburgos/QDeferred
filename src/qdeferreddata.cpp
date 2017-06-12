@@ -21,7 +21,7 @@ bool QDeferredProxyObject::event(QEvent * ev)
 
 QDeferredProxyEvent::QDeferredProxyEvent() : QEvent(QDEFERREDPROXY_EVENT_TYPE)
 {
-
+	// nothing to do here
 }
 
 // define static members and methods of base class
@@ -31,7 +31,7 @@ QMap< QThread *, QDeferredProxyObject * > QDeferredDataBase::s_threadMap;
 QDeferredProxyObject * QDeferredDataBase::getObjectForThread(QThread * p_currThd)
 {
 	// lock multithread access
-	QDeferredDataBase::s_mutex.lock();
+	QMutexLocker locker(&QDeferredDataBase::s_mutex);
 	// if not in list then...
 	if (!s_threadMap.contains(p_currThd))
 	{
@@ -45,8 +45,6 @@ QDeferredProxyObject * QDeferredDataBase::getObjectForThread(QThread * p_currThd
 		// add to all maps
 		s_threadMap[p_currThd] = new QDeferredProxyObject;
 	}
-	// unlock multithread access
-	QDeferredDataBase::s_mutex.unlock();
 	// return
 	return s_threadMap[p_currThd];
 }

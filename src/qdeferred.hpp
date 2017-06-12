@@ -15,8 +15,8 @@ class QDeferred
 public:
 	// constructors
 	QDeferred();
-	QDeferred(const QDeferred<Types...> &);
-	QDeferred &operator=(const QDeferred<Types...> &);
+	QDeferred(const QDeferred<Types...> &other);
+	QDeferred &operator=(const QDeferred<Types...> &rhs);
 	~QDeferred();
 
 	// wrapper consumer API (with chaning)
@@ -95,6 +95,9 @@ private:
 #endif
 };
 
+// alias for no argument types
+using QDefer = QDeferred<>;
+
 #if defined(QT_DEBUG) && defined(Q_OS_WIN)
 template<class ...Types>
 inline QString QDeferred<Types...>::createVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd)
@@ -114,9 +117,6 @@ inline QString QDeferred<Types...>::createVsDbg_Impl(const char *file, const cha
 	return QString("File: %1, Func: %2, Line: %3, Thd: %4").arg(file).arg(strFunc).arg(line).arg(QString::fromStdString(stream.str()));
 }
 #endif
-
-// alias for no argument types
-using QDefer = QDeferred<>;
 
 template<class ...Types>
 QDeferred<Types...>::QDeferred() : m_data(nullptr)

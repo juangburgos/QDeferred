@@ -33,11 +33,11 @@ public:
 
 };
 
+// have all template classes derive from common base class which to contains the static members
 // forward declaration to be able to make friend
 template<class ...Types>
 class QDeferred;
-
-// have all template classes derive from common base class which to contains the static members
+// base class
 class QDeferredDataBase {
 
 protected:
@@ -79,10 +79,10 @@ enum QDeferredState
 	REJECTED
 };
 
+// the actual deferred object implementation, Types are the callback arguments
 template<class ...Types>
 class QDeferredData : public QSharedData, public QDeferredDataBase
 {
-	
 public:
 	// constructors
 	QDeferredData();

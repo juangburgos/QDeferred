@@ -20,14 +20,20 @@ int main(int argc, char *argv[])
     QCoreApplication a(argc, argv);
 	qDebug() << "[INFO] Main thread = " << QThread::currentThread();
 
-
-	QLambdaThreadWorker worker;
-	qDebug() << "[INFO] Worker thread = " << worker.getThreadId();
-	// do something in different thread
-	worker.execInThread([]() mutable {
-		qDebug() << "[INFO] Call execInThread in thread = " << QThread::currentThread();
-
+	QDynEvts eventer;
+	
+	eventer.on("change", []()  {
+		qDebug() << "[INFO] Riverside motherfocker!";
 	});
+
+	eventer.trigger("change");
+	//QLambdaThreadWorker worker;
+	//qDebug() << "[INFO] Worker thread = " << worker.getThreadId();
+	//// do something in different thread
+	//worker.execInThread([]() mutable {
+	//	qDebug() << "[INFO] Call execInThread in thread = " << QThread::currentThread();
+
+	//});
 
     return a.exec();
 }
