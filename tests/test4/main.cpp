@@ -2,7 +2,7 @@
 #include <QDebug>
 
 #include <QDeferred>
-#include <QDefThreadWorker>
+#include <QLambdaThreadWorker>
 
 /*
 LAMBDA CAPTURE
@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 		qDebug() << "[INFO] Done callback with  " << num << " in thread = " << QThread::currentThread();
 	};
 
-	QDefThreadWorker worker;
+	QLambdaThreadWorker worker;
 	qDebug() << "[INFO] Worker thread = " << worker.getThreadId();
 	for (int i = 0; i < 1000000; i++)
 	{

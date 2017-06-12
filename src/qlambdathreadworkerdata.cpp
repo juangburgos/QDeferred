@@ -1,22 +1,22 @@
-#include "qdefthreadworkerdata.h"
+#include "qlambdathreadworkerdata.h"
 #include <QCoreApplication>
 #include <sstream>
 
-QDefThreadWorkerDataEvent::QDefThreadWorkerDataEvent() : QEvent(QDEFTHREADWORKERDATA_EVENT_TYPE)
+QLambdaThreadWorkerDataEvent::QLambdaThreadWorkerDataEvent() : QEvent(QLAMBDATHREADWORKERDATA_EVENT_TYPE)
 {
 	// nothing to do here
 }
 
-QDefThreadWorkerObjectData::QDefThreadWorkerObjectData() : QObject(nullptr)
+QLambdaThreadWorkerObjectData::QLambdaThreadWorkerObjectData() : QObject(nullptr)
 {
 	// nothing to do here either
 }
 
-bool QDefThreadWorkerObjectData::event(QEvent * ev)
+bool QLambdaThreadWorkerObjectData::event(QEvent * ev)
 {
-	if (ev->type() == QDEFTHREADWORKERDATA_EVENT_TYPE) {
+	if (ev->type() == QLAMBDATHREADWORKERDATA_EVENT_TYPE) {
 		// call function
-		static_cast<QDefThreadWorkerDataEvent*>(ev)->m_eventFunc();
+		static_cast<QLambdaThreadWorkerDataEvent*>(ev)->m_eventFunc();
 		// return event processed
 		return true;
 	}
@@ -24,10 +24,10 @@ bool QDefThreadWorkerObjectData::event(QEvent * ev)
 	return QObject::event(ev);
 }
 
-QDefThreadWorkerData::QDefThreadWorkerData()
+QLambdaThreadWorkerData::QLambdaThreadWorkerData()
 {
 	mp_workerThread = new QThread;
-	mp_workerObj    = new QDefThreadWorkerObjectData;
+	mp_workerObj    = new QLambdaThreadWorkerObjectData;
 	// get thread id
 	std::stringstream stream;
 	stream << std::hex << (size_t)mp_workerThread;
@@ -39,29 +39,29 @@ QDefThreadWorkerData::QDefThreadWorkerData()
 	mp_workerThread->start();
 }
 
-QDefThreadWorkerData::QDefThreadWorkerData(const QDefThreadWorkerData &other) : QSharedData(other),
+QLambdaThreadWorkerData::QLambdaThreadWorkerData(const QLambdaThreadWorkerData &other) : QSharedData(other),
 mp_workerObj(other.mp_workerObj)
 {
 	this->mp_workerThread = other.mp_workerThread; 
 }
 
-QDefThreadWorkerData::~QDefThreadWorkerData()
+QLambdaThreadWorkerData::~QLambdaThreadWorkerData()
 {
 	mp_workerThread->quit();
 	mp_workerThread->wait();
 	mp_workerThread->deleteLater();
 }
 
-void QDefThreadWorkerData::execInThread(std::function<void()> &threadFunc)
+void QLambdaThreadWorkerData::execInThread(std::function<void()> &threadFunc)
 {
 	// create event to exec in thread
-	QDefThreadWorkerDataEvent * p_Evt = new QDefThreadWorkerDataEvent;
+	QLambdaThreadWorkerDataEvent * p_Evt = new QLambdaThreadWorkerDataEvent;
 	p_Evt->m_eventFunc = threadFunc;
 	// post event to thread
 	QCoreApplication::postEvent(mp_workerObj, p_Evt);
 }
 
-QString QDefThreadWorkerData::getThreadId()
+QString QLambdaThreadWorkerData::getThreadId()
 {
 	return m_strThreadId;
 }

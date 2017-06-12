@@ -7,36 +7,36 @@
 #include <QSharedData>
 #include <functional>
 
-#define QDEFTHREADWORKERDATA_EVENT_TYPE (QEvent::Type)(QEvent::User + 666)
+#define QLAMBDATHREADWORKERDATA_EVENT_TYPE (QEvent::Type)(QEvent::User + 666)
 
  // QDEFTHREADWORKERDATAEVENT -------------------------------------------------
-class QDefThreadWorkerDataEvent : public QEvent
+class QLambdaThreadWorkerDataEvent : public QEvent
 {
 public:
-	explicit QDefThreadWorkerDataEvent();
+	explicit QLambdaThreadWorkerDataEvent();
 
 	std::function<void()> m_eventFunc;
 
 };
 
 // QDEFTHREADWORKEROBJECTDATA -----------------------------------------------------
-class QDefThreadWorkerObjectData : public QObject
+class QLambdaThreadWorkerObjectData : public QObject
 {
 	Q_OBJECT
 public:
-	explicit QDefThreadWorkerObjectData();
+	explicit QLambdaThreadWorkerObjectData();
 
 	bool event(QEvent* ev);
 
 };
 
 // QDEFTHREADWORKERDATA -----------------------------------------------------
-class QDefThreadWorkerData : public QSharedData
+class QLambdaThreadWorkerData : public QSharedData
 {
 public:
-	QDefThreadWorkerData();
-	QDefThreadWorkerData(const QDefThreadWorkerData &other);
-	~QDefThreadWorkerData();
+	QLambdaThreadWorkerData();
+	QLambdaThreadWorkerData(const QLambdaThreadWorkerData &other);
+	~QLambdaThreadWorkerData();
 
 	void execInThread(std::function<void()> &threadFunc);
 
@@ -44,7 +44,7 @@ public:
 	
 private:
 	QThread                    * mp_workerThread;
-	QDefThreadWorkerObjectData * mp_workerObj;
+	QLambdaThreadWorkerObjectData * mp_workerObj;
 	QString                      m_strThreadId;
 };
 
