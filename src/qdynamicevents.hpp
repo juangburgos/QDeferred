@@ -148,9 +148,9 @@ void QDynamicEvents<Types...>::createProxyObj(QString &strEventName)
 		QDynamicEventsProxyObject * p_obj = QDynamicEventsBase::getObjectForThread(p_currThd);
 		// wait until object destroyed to remove callbacks struct
 		// NOTE : need to disconnect these connections to avoid memory leaks due to lambda memory allocations
-		m_connectionList.append(QObject::connect(p_obj, &QObject::destroyed, [&, p_currThd]() {
+		m_connectionList.append(QObject::connect(p_obj, &QObject::destroyed, [this, strEventName, p_currThd]() {
 			// delete callbacks when thread gets deleted
-			m_callbacksMap[strEventName].remove(p_currThd);
+			this->m_callbacksMap[strEventName].remove(p_currThd);
 		}));
 	};
 }
