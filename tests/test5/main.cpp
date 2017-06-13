@@ -58,6 +58,50 @@ int main(int argc, char *argv[])
 		// trigger 'sorted' thread 1
 		qDebug() << "[INFO] Event \"sorted\" triggered in thread " << QThread::currentThread();
 		eventer1.trigger("sorted");
+		// handle thread 2
+		eventer1.on("change", [pThread2]() {
+			qDebug() << "[INFO] Event \"change\" subscribed in thread " << pThread2 << ", handled in thread " << QThread::currentThread();
+		});
+		auto evtHandle = eventer1.on("sorted", [pThread2]() {
+			qDebug() << "[INFO] Event \"sorted\" subscribed in thread " << pThread2 << ", handled in thread " << QThread::currentThread();
+		});
+		// cyclic triggering and off testing
+		QTimer *timer = new QTimer();
+		// since timer is on heap, we must delete it eventually
+		QObject::connect(QThread::currentThread(), &QThread::finished, [timer]() {
+			timer->stop();
+			timer->deleteLater();
+		});
+		// set timer timeout
+		QObject::connect(timer, &QTimer::timeout, [&eventer1, evtHandle]() mutable {
+			static int  counter       = 0;
+			counter++;
+			// off conditions
+			if (counter == 5)
+			{
+				eventer1.off("change");
+			} 
+			else if (counter == 10)
+			{
+				eventer1.off(evtHandle);
+			}
+			else if (counter == 15)
+			{
+				eventer1.off();
+			}
+			else if (counter == 20)
+			{
+				QCoreApplication::quit();
+			}
+			// trigger 'change' thread 2
+			qDebug() << "[INFO] Event \"change\" triggered in thread " << QThread::currentThread();
+			eventer1.trigger("change");
+			// trigger 'sorted' thread 2
+			qDebug() << "[INFO] Event \"sorted\" triggered in thread " << QThread::currentThread();
+			eventer1.trigger("sorted");
+		});
+		// start timer
+		timer->start(1000);
 	});
 
 	// trigger 'change' main thread

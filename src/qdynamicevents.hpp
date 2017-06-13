@@ -93,7 +93,7 @@ private:
 	// create proxy object for unknown thread
 	void createProxyObj(QString &strEventName);
 	// internal on
-	void onInternal(QString &strEventName, std::function<void(Types(&...args))> callback);
+	void onInternal(QString &strEventName, size_t &evtHandle, std::function<void(Types(&...args))> callback);
 	// internal trigger
 	void triggerInternal(QString &strEventName, Types(&...args));
 };
@@ -165,19 +165,20 @@ QDynamicEventsHandle QDynamicEvents<Types...>::on(QString strEventName, std::fun
 	// lock after
 	QMutexLocker locker(&m_mutex);
 	// for each event name
+	size_t evtHandle = (size_t)(&callback);
 	for (int i = 0; i < listEventNames.count(); i++)
 	{
-		onInternal(listEventNames[i], callback);
+		onInternal(listEventNames[i], evtHandle, callback);
 	}
 	// return hash
-	return QDynamicEventsHandle(strEventName, QThread::currentThread(), (size_t)(&callback));
+	return QDynamicEventsHandle(strEventName, QThread::currentThread(), evtHandle);
 }
 
 template<class ...Types>
-void QDynamicEvents<Types...>::onInternal(QString &strEventName, std::function<void(Types(&...args))> callback)
+void QDynamicEvents<Types...>::onInternal(QString &strEventName, size_t &evtHandle, std::function<void(Types(&...args))> callback)
 {
 	// [NOTE] No lock in internal methods
-	m_callbacksMap[strEventName][QThread::currentThread()][(size_t)(&callback)] = callback;
+	m_callbacksMap[strEventName][QThread::currentThread()][evtHandle] = callback;
 }
 
 template<class ...Types>

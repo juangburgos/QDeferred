@@ -60,6 +60,7 @@ QDeferred<int> ThreadController::doProgressWork(int delay, int max)
 			qDebug() << "[INFO] Finished timer... Hasta la vista baby!";
 			QThread::msleep(6000);
 		});
+		// set timer timeout
 		QObject::connect(timer, &QTimer::timeout, [retDeferred, max]() mutable {
 			static int counter = 0;
 			counter++;
@@ -78,6 +79,7 @@ QDeferred<int> ThreadController::doProgressWork(int delay, int max)
 				QCoreApplication::quit();
 			}
 		});
+		// start timer
 		timer->start(delay);
 	};
 	// post event for object with correct thread affinity
