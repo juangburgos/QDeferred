@@ -34,15 +34,9 @@ public:
 class QDynamicEventsBase {
 
 protected:
-
-
-
 	static QDynamicEventsProxyObject * getObjectForThread(QThread * p_currThd);
-
 	static QMap< QThread *, QDynamicEventsProxyObject * > s_threadMap;
-
 	static QMutex s_mutex;
-
 };
 
 // forward declaration to be able to make friend
@@ -62,7 +56,6 @@ private:
 	size_t    m_funcId;
 };
 
-
 // the actual dynamic events object implementation, Types are the callback arguments
 template<class ...Types>
 class QDynamicEvents : public QDynamicEventsBase
@@ -74,6 +67,12 @@ public:
 
 	// on method	
 	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback);
+	// off method (all callbacks registered to an specific event name)
+	void off(QString strEventName);
+	// off method (specific callback based on handle)
+	void off(QDynamicEventsHandle evtHandle);
+	// off method (all callbacks)
+	void off();
 
 	// provider API
 	void trigger(QString strEventName, Types(&...args));
@@ -84,9 +83,9 @@ private:
 	// list of connections to avoid memory leaks
 	QList<QMetaObject::Connection> m_connectionList;
 	// map of maps of maps, multiple callbacks by:
-	QMap< QString, // by event name
-		QMap< QThread *, // by thread
-			QMap< size_t, // a hash or identifier for the function
+	QMap< QString,        // by event name
+		QMap< QThread *,  // by thread
+			QMap< size_t, // an identifier for the function
 					std::function<void(Types(&...args))>
 				> 
 			> 
@@ -95,7 +94,33 @@ private:
 	void createProxyObj(QString &strEventName);
 	// internal on
 	void onInternal(QString &strEventName, std::function<void(Types(&...args))> callback);
+	// internal trigger
+	void triggerInternal(QString &strEventName, Types(&...args));
 };
+
+template<class ...Types>
+void QDynamicEvents<Types...>::off(QString strEventName)
+{
+	QMutexLocker locker(&m_mutex);
+	// remove for all threads and all callbacks
+	m_callbacksMap.remove(strEventName);
+}
+
+template<class ...Types>
+void QDynamicEvents<Types...>::off(QDynamicEventsHandle evtHandle)
+{
+	QMutexLocker locker(&m_mutex);
+	// remove very specific callback
+	m_callbacksMap[evtHandle.m_strEventName][evtHandle.mp_handleThread].remove(evtHandle.m_funcId);
+}
+
+template<class ...Types>
+void QDynamicEvents<Types...>::off()
+{
+	QMutexLocker locker(&m_mutex);
+	// remove all callbacks
+	m_callbacksMap.clear();
+}
 
 // alias for no argument types
 using QDynEvts = QDynamicEvents<>;
@@ -125,7 +150,7 @@ void QDynamicEvents<Types...>::createProxyObj(QString &strEventName)
 		// NOTE : need to disconnect these connections to avoid memory leaks due to lambda memory allocations
 		m_connectionList.append(QObject::connect(p_obj, &QObject::destroyed, [&, p_currThd]() {
 			// delete callbacks when thread gets deleted
-			m_callbacksMap[strEventName].take(p_currThd);
+			m_callbacksMap[strEventName].remove(p_currThd);
 		}));
 	};
 }
@@ -151,13 +176,27 @@ QDynamicEventsHandle QDynamicEvents<Types...>::on(QString strEventName, std::fun
 template<class ...Types>
 void QDynamicEvents<Types...>::onInternal(QString &strEventName, std::function<void(Types(&...args))> callback)
 {
+	// [NOTE] No lock in internal methods
 	m_callbacksMap[strEventName][QThread::currentThread()][(size_t)(&callback)] = callback;
 }
 
 template<class ...Types>
 void QDynamicEvents<Types...>::trigger(QString strEventName, Types(&...args))
 {
-	QMutexLocker locker(&m_mutex);
+	QMutexLocker locker(&m_mutex);	
+	// split by spaces
+	QStringList listEventNames = strEventName.split(QRegExp("\\s+"), QString::SkipEmptyParts);
+	// for each event name
+	for (int i = 0; i < listEventNames.count(); i++)
+	{
+		triggerInternal(listEventNames[i], args...);
+	}
+}
+
+template<class ...Types>
+void QDynamicEvents<Types...>::triggerInternal(QString &strEventName, Types(&...args))
+{
+	// [NOTE] No lock in internal methods
 	// for each thread where there are callbacks to be called
 	auto listThreads = m_callbacksMap[strEventName].keys();
 	for (int i = 0; i < listThreads.count(); i++)
