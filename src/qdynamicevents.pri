@@ -2,6 +2,7 @@ CONFIG += c++11
 
 INCLUDEPATH += $$PWD/
 
-HEADERS  += $$PWD/qdynamicevents.hpp
+HEADERS  += $$PWD/qdynamicevents.hpp \
+            $$PWD/qdynamiceventsdata.hpp
 
-SOURCES  += $$PWD/qdynamicevents.cpp
+SOURCES  += $$PWD/qdynamiceventsdata.cpp

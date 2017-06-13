@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 	});
 
 	// work in thread 1
-	worker1.execInThread([&eventer1, &eventer2, p_worker2]() mutable {
+	worker1.execInThread([eventer1, eventer2, p_worker2]() mutable {
 		QThread * pThread1 = QThread::currentThread();
 		// handle thread 1
 		eventer1.on("change", [pThread1](int iVal) {
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 			timer->deleteLater();
 		});
 		// set timer timeout
-		QObject::connect(timer, &QTimer::timeout, [&eventer1, &eventer2, p_worker2]() mutable {
+		QObject::connect(timer, &QTimer::timeout, [eventer1, eventer2, p_worker2]() mutable {
 			static int  counter = 0;
 			counter++;
 			// trigger 'change' and 'reorden' thread 1
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 	});
 
 	// work in thread 2
-	p_worker2->execInThread([&eventer1, &eventer2]() mutable {
+	p_worker2->execInThread([eventer1, eventer2]() mutable {
 		QThread * pThread2 = QThread::currentThread();
 		// handle main thread
 		eventer1.on("sorted", [pThread2](int iVal) {
@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
 			timer->deleteLater();
 		});
 		// set timer timeout
-		QObject::connect(timer, &QTimer::timeout, [&eventer1, &eventer2]() mutable {
+		QObject::connect(timer, &QTimer::timeout, [eventer1, eventer2]() mutable {
 			static int  counter       = 0;
 			counter++;
 			// trigger 'change' and 'reorden' thread 1

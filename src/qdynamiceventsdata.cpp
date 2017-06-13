@@ -23,20 +23,20 @@ QDynamicEventsProxyEvent::QDynamicEventsProxyEvent() : QEvent(QDYNAMICEVENTSPROX
 }
 
 // define static members and methods of base class
-QMutex QDynamicEventsBase::s_mutex;
-QMap< QThread *, QDynamicEventsProxyObject * > QDynamicEventsBase::s_threadMap;
+QMutex QDynamicEventsDataBase::s_mutex;
+QMap< QThread *, QDynamicEventsProxyObject * > QDynamicEventsDataBase::s_threadMap;
 
-QDynamicEventsProxyObject * QDynamicEventsBase::getObjectForThread(QThread * p_currThd)
+QDynamicEventsProxyObject * QDynamicEventsDataBase::getObjectForThread(QThread * p_currThd)
 {
 	// lock multithread access
-	QMutexLocker locker(&QDynamicEventsBase::s_mutex);
+	QMutexLocker locker(&QDynamicEventsDataBase::s_mutex);
 	// if not in list then...
 	if (!s_threadMap.contains(p_currThd))
 	{
 		// subscribe to finish
 		QObject::connect(p_currThd, &QThread::finished, [p_currThd]() {
 			// if finished, remove
-			auto p_objToDelete = QDynamicEventsBase::s_threadMap.take(p_currThd);
+			auto p_objToDelete = QDynamicEventsDataBase::s_threadMap.take(p_currThd);
 			// mark the object for deletion
 			p_objToDelete->deleteLater();
 		});
