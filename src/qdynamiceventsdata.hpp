@@ -74,6 +74,8 @@ public:
 
 	// on method	
 	QDynamicEventsHandle on(QString strEventName, size_t evtHandle, std::function<void(Types(&...args))> callback);
+	// once method	
+	QDynamicEventsHandle once(QString strEventName, size_t evtHandle, std::function<void(Types(&...args))> callback);
 	// off method (all callbacks registered to an specific event name)
 	void off(QString strEventName);
 	// off method (specific callback based on handle)
@@ -98,10 +100,20 @@ private:
 				> 
 			> 
 		> m_callbacksMap;
+	// map of maps of maps, multiple callbacks by:
+	QMap< QString,        // by event name
+		QMap< QThread *,  // by thread
+			QMap< size_t, // an identifier for the function
+					std::function<void(Types(&...args))>
+				>
+			>
+		> m_callbacksMapOnce;
 	// create proxy object for unknown thread
 	void createProxyObj(QString &strEventName);
 	// internal on
 	void onInternal(QString &strEventName, size_t &evtHandle, std::function<void(Types(&...args))> callback);
+	// internal once
+	void onceInternal(QString &strEventName, size_t &evtHandle, std::function<void(Types(&...args))> callback);
 	// off method (all callbacks registered to an specific event name)
 	void offInternal(QString &strEventName);
 	// off method (specific callback based on handle)
@@ -135,6 +147,7 @@ QDynamicEventsData<Types...>::~QDynamicEventsData()
 		QObject::disconnect(m_connectionList[i]);
 	}
 	m_callbacksMap.clear();
+	m_callbacksMapOnce.clear();
 }
 
 template<class ...Types>
@@ -155,6 +168,7 @@ void QDynamicEventsData<Types...>::offInternal(QString &strEventName)
 {
 	// remove for all threads and all callbacks
 	m_callbacksMap.remove(strEventName);
+	m_callbacksMapOnce.remove(strEventName);
 }
 
 template<class ...Types>
@@ -175,6 +189,7 @@ void QDynamicEventsData<Types...>::offInternal(QString &strEventName, QThread *p
 {
 	// remove very specific callback
 	m_callbacksMap[strEventName][pThread].remove(funcId);
+	m_callbacksMapOnce[strEventName][pThread].remove(funcId);
 }
 
 template<class ...Types>
@@ -183,6 +198,7 @@ void QDynamicEventsData<Types...>::off()
 	QMutexLocker locker(&m_mutex);
 	// remove all callbacks
 	m_callbacksMap.clear();
+	m_callbacksMapOnce.clear();
 }
 
 template<class ...Types>
@@ -204,6 +220,7 @@ void QDynamicEventsData<Types...>::createProxyObj(QString &strEventName)
 		m_connectionList.append(QObject::connect(p_obj, &QObject::destroyed, [this, strCurrEvtName, p_currThd]() {
 			// delete callbacks when thread gets deleted
 			this->m_callbacksMap[strCurrEvtName].remove(p_currThd);
+			this->m_callbacksMapOnce[strCurrEvtName].remove(p_currThd);
 		}));
 	}
 }
@@ -234,6 +251,31 @@ void QDynamicEventsData<Types...>::onInternal(QString &strEventName, size_t &evt
 }
 
 template<class ...Types>
+QDynamicEventsHandle QDynamicEventsData<Types...>::once(QString strEventName, size_t evtHandle, std::function<void(Types(&...args))> callback)
+{
+	// split by spaces
+	QStringList listEventNames = strEventName.split(QRegExp("\\s+"), QString::SkipEmptyParts);
+	// create proxy object if necessary
+	this->createProxyObj(strEventName);
+	// lock after
+	QMutexLocker locker(&m_mutex);
+	// for each event name
+	for (int i = 0; i < listEventNames.count(); i++)
+	{
+		onceInternal(listEventNames[i], evtHandle, callback);
+	}
+	// return hash
+	return QDynamicEventsHandle(strEventName, QThread::currentThread(), evtHandle);
+}
+
+template<class ...Types>
+void QDynamicEventsData<Types...>::onceInternal(QString &strEventName, size_t &evtHandle, std::function<void(Types(&...args))> callback)
+{
+	// [NOTE] No lock in internal methods
+	m_callbacksMapOnce[strEventName][QThread::currentThread()][evtHandle] = callback;
+}
+
+template<class ...Types>
 void QDynamicEventsData<Types...>::trigger(QDynamicEvents<Types...> ref, QString strEventName, Types(&...args))
 {
 	QMutexLocker locker(&m_mutex);	
@@ -250,6 +292,8 @@ template<class ...Types>
 void QDynamicEventsData<Types...>::triggerInternal(QDynamicEvents<Types...> ref, QString &strEventName, Types(&...args))
 {
 	// [NOTE] No lock in internal methods
+
+	// on method callbacks *********************************************************
 	// for each thread where there are callbacks to be called
 	auto listThreads = m_callbacksMap[strEventName].keys();
 	for (int i = 0; i < listThreads.count(); i++)
@@ -266,6 +310,31 @@ void QDynamicEventsData<Types...>::triggerInternal(QDynamicEvents<Types...> ref,
 			{
 				auto currHandle = listHandles.at(j);
 				mapOnlyCallbacks[currHandle](args...);
+			}
+			// unused, but we need it to keep at least one reference until all callbacks are executed
+			Q_UNUSED(ref)
+		};
+		// post event for object with correct thread affinity
+		QCoreApplication::postEvent(p_currObject, p_Evt);
+	}
+
+	// once method callbacks *********************************************************
+	// for each thread where there are callbacks to be called
+	auto listThreadsOnce = m_callbacksMapOnce[strEventName].keys();
+	for (int i = 0; i < listThreadsOnce.count(); i++)
+	{
+		auto p_currThread = listThreadsOnce.at(i);
+		auto p_currObject = QDynamicEventsDataBase::getObjectForThread(p_currThread);
+		// create object in heap and assign function (event loop takes ownership and deletes it later)
+		QDynamicEventsProxyEvent * p_Evt = new QDynamicEventsProxyEvent;
+		// NOTE below the difference is the 'take' method which ensures callbacks are only execd once
+		auto mapOnlyCallbacksOnce = this->m_callbacksMapOnce[strEventName].take(p_currThread);
+		p_Evt->m_eventFunc = [ref, mapOnlyCallbacksOnce, args...]() mutable {
+			auto listHandles = mapOnlyCallbacksOnce.keys();
+			for (int j = 0; j < listHandles.count(); j++)
+			{
+				auto currHandle = listHandles.at(j);
+				mapOnlyCallbacksOnce[currHandle](args...);
 			}
 			// unused, but we need it to keep at least one reference until all callbacks are executed
 			Q_UNUSED(ref)

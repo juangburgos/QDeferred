@@ -23,6 +23,8 @@ public:
 
 	// on method	
 	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback);
+	// once method	
+	QDynamicEventsHandle once(QString strEventName, std::function<void(Types(&...args))> callback);
 	// off method (all callbacks registered to an specific event name)
 	void off(QString strEventName);
 	// off method (specific callback based on handle)
@@ -77,6 +79,14 @@ QDynamicEventsHandle QDynamicEvents<Types...>::on(QString strEventName, std::fun
 	// NOTE need to create the handle here in order to make it unique
 	size_t evtHandle = (size_t)(&callback);
 	return m_data->on(strEventName, evtHandle, callback);
+}
+
+template<class ...Types>
+QDynamicEventsHandle QDynamicEvents<Types...>::once(QString strEventName, std::function<void(Types(&...args))> callback)
+{
+	// NOTE need to create the handle here in order to make it unique
+	size_t evtHandle = (size_t)(&callback);
+	return m_data->once(strEventName, evtHandle, callback);
 }
 
 template<class ...Types>

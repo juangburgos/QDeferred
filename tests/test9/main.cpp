@@ -52,6 +52,21 @@ int main(int argc, char *argv[])
 	iVal = 321;
 	eventer1.trigger("sorted change", iVal);
 
+	// tests for once method
+	eventer1.once("change", [](int iVal) {
+		qDebug() << "[INFO:ONCE] Event \"change\" with arg = " << iVal;
+	});
+	eventer1.once("sorted", [](int iVal) {
+		qDebug() << "[INFO:ONCE] Event \"sorted\" with arg = " << iVal;
+	});
+	eventer1.once("change sorted", [](int iVal) {
+		qDebug() << "[INFO:ONCE] Event \"change & sorted\" with arg = " << iVal;
+	});
+	iVal = 12345;
+	eventer1.trigger("change sorted", iVal);
+	iVal = 67890;
+	eventer1.trigger("sorted change", iVal);
+
     return a.exec();
 }
 
