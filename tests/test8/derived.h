@@ -28,8 +28,13 @@ public:
 	void    set_stringval(QString strVal);
 	QString get_stringval();
 
-	template<typename ...Types>
-	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback);
+	// NOTE : with variadic templates compiles but VS intellisense fails and marks with ulgy red
+	//template<typename ...Types>
+	//QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback);
+	template<typename T1>
+	QDynamicEventsHandle on(QString strEventName, std::function<void(T1)> callback);
+	template<typename T1, typename T2>
+	QDynamicEventsHandle on(QString strEventName, std::function<void(T1, T2)> callback);
 
 private:
 	bool    m_internalBool;
@@ -41,10 +46,22 @@ private:
 	void trigger(QString strEventName, Types(...args));
 };
 
-template<typename ...Types>
-QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(Types(&...args))> callback)
+//template<typename ...Types>
+//QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(Types(&...args))> callback)
+//{
+//	return QDynamicEvents<Types...>::on(strEventName, callback);
+//}
+
+template<typename T1>
+QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(T1)> callback)
 {
-	return QDynamicEvents<Types...>::on(strEventName, callback);
+	return QDynamicEvents<T1>::on(strEventName, callback);
+}
+
+template<typename T1, typename T2>
+QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(T1, T2)> callback)
+{
+	return QDynamicEvents<T1, T2>::on(strEventName, callback);
 }
 
 template<typename ...Types>

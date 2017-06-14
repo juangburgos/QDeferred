@@ -74,7 +74,9 @@ QDynamicEvents<Types...>::~QDynamicEvents()
 template<class ...Types>
 QDynamicEventsHandle QDynamicEvents<Types...>::on(QString strEventName, std::function<void(Types(&...args))> callback)
 {
-	return m_data->on(strEventName, callback);
+	// NOTE need to create the handle here in order to make it unique
+	size_t evtHandle = (size_t)(&callback);
+	return m_data->on(strEventName, evtHandle, callback);
 }
 
 template<class ...Types>

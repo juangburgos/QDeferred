@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 
 	Derived derived1;
 
-	derived1.on<bool>("change:boolval", [](bool bVal) {
+	derived1.on<bool>(QString("change:boolval"), [](bool bVal) {
 		qDebug() << "[INFO] Boolean value (boolval) has been changed = " << bVal;
 	});
 	derived1.on<int>("change:intval", [](int iVal) {
