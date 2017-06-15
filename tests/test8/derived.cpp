@@ -8,6 +8,11 @@ Derived::Derived()
 	m_internalString = "";
 }
 
+Derived::~Derived()
+{
+	m_mapEventers.clear();
+}
+
 void Derived::set_boolval(bool bVal)
 {
 	m_internalBool = bVal;

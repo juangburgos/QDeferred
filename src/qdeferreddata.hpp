@@ -46,6 +46,8 @@ protected:
 	template<class ...Types>
 	friend class QDeferred;
 
+	// NOTE : recursive unpacking of parameter pack
+	// http://kevinushey.github.io/blog/2016/01/27/introduction-to-c++-variadic-templates/
 	template<class T>
 	static void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, T t)
 	{

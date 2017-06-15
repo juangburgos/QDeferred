@@ -22,25 +22,23 @@ int main(int argc, char *argv[])
 	// init threads
 	QThread * pMainThread = QThread::currentThread();
 	qDebug() << "[INFO] Main thread = " << pMainThread;
-	QLambdaThreadWorker worker1;
-	qDebug() << "[INFO] Worker thread 1 = " << worker1.getThreadId();
 
 	Derived derived1;
 
-	derived1.on<bool>(QString("change:boolval"), [](bool bVal) {
-		qDebug() << "[INFO] Boolean value (boolval) has been changed = " << bVal;
+	derived1.on<bool>("change:boolval", [](bool bVal) {
+		qDebug() << "[INFO:D1] Boolean value (boolval) has been changed = " << bVal;
 	});
 	derived1.on<int>("change:intval", [](int iVal) {
-		qDebug() << "[INFO] Integer value (intval) has been changed = " << iVal;
+		qDebug() << "[INFO:D1] Integer value (intval) has been changed = " << iVal;
 	});
 	derived1.on<double>("change:doubleval", [](double dVal) {
-		qDebug() << "[INFO] Double value (doubleval) has been changed = " << dVal;
+		qDebug() << "[INFO:D1] Double value (doubleval) has been changed = " << dVal;
 	});
 	derived1.on<QString>("change:stringval", [](QString strVal) {
-		qDebug() << "[INFO] String value (stringval) has been changed = " << strVal;
+		qDebug() << "[INFO:D1] String value (stringval) has been changed = " << strVal;
 	});
 	derived1.on<QString, QVariant>("change", [](QString strAttrName, QVariant varVal) {
-		qDebug() << "[INFO] Some value (change) (" << strAttrName << ") has been changed = " << varVal;
+		qDebug() << "[INFO:D1] Some value (change) (" << strAttrName << ") has been changed = " << varVal;
 	});
 
 	// change once
@@ -53,6 +51,18 @@ int main(int argc, char *argv[])
 	derived1.set_intval(987);
 	derived1.set_doubleval(3.1416);
 	derived1.set_stringval("World");
+
+	// TODO : test in a loop
+
+	Derived derived2;
+
+	derived2.on<bool>("change:boolval", [](bool bVal) {
+		qDebug() << "[INFO:D2] Boolean value (boolval) has been changed = " << bVal;
+	});
+	// change several times
+	derived2.set_boolval(true);
+	derived2.set_boolval(false);
+	derived2.set_boolval(true);
 
     return a.exec();
 }

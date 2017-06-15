@@ -1,20 +1,22 @@
 #ifndef DERIVED_H
 #define DERIVED_H
 
+#include <typeinfo>
+#include <typeindex>
+
+#include <QMap>
+#include <QScopedPointer>
 #include <QVariant>
 
 #include <QDynamicEvents>
 
-class Derived :
-	public QDynamicEvents<bool>    ,
-	public QDynamicEvents<int>     ,
-	public QDynamicEvents<double>  ,
-	public QDynamicEvents<QString> ,
-	public QDynamicEvents<QVariant>,
-	public QDynamicEvents<QString, QVariant>
+// TODO : make a base class in order to add functionality by inheriting
+
+class Derived
 {
 public:
 	Derived();
+	~Derived();
 
 	void    set_boolval(bool bVal);
 	bool    get_boolval();
@@ -28,13 +30,11 @@ public:
 	void    set_stringval(QString strVal);
 	QString get_stringval();
 
-	// NOTE : with variadic templates compiles but VS intellisense fails and marks with ulgy red
-	//template<typename ...Types>
-	//QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback);
-	template<typename T1>
-	QDynamicEventsHandle on(QString strEventName, std::function<void(T1)> callback);
-	template<typename T1, typename T2>
-	QDynamicEventsHandle on(QString strEventName, std::function<void(T1, T2)> callback);
+	// NOTE : inline below are useless, only to avoid intellisense ugly read
+	template<typename ...Types, typename T>
+	inline QDynamicEventsHandle on(QString strEventName, T callback) {
+		return onAlias<Types...>(strEventName, callback);
+	};
 
 private:
 	bool    m_internalBool;
@@ -44,30 +44,44 @@ private:
 
 	template<typename ...Types>
 	void trigger(QString strEventName, Types(...args));
+
+	// without alias would work, but annoying intellisense appears 
+	template<typename ...Types>
+	QDynamicEventsHandle onAlias(QString strEventName, std::function<void(Types(&...args))> callback);
+
+	/*
+	use combination of QMap and template function to emulate  variable templates
+	http://en.cppreference.com/w/cpp/language/variable_template
+	https://stackoverflow.com/questions/37912378/variable-templates-only-available-with-c14
+	http://en.cppreference.com/w/cpp/types/type_index
+	*/
+	QMap<std::type_index, QAbstractDynamicEvents*> m_mapEventers;
+	template<typename ...Types>
+	QDynamicEvents<Types...> getEventer();
 };
 
-//template<typename ...Types>
-//QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(Types(&...args))> callback)
-//{
-//	return QDynamicEvents<Types...>::on(strEventName, callback);
-//}
-
-template<typename T1>
-QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(T1)> callback)
+template<typename ...Types>
+QDynamicEvents<Types...> Derived::getEventer()
 {
-	return QDynamicEvents<T1>::on(strEventName, callback);
+	// create once eventer for each Types... (combination of types) used in code
+	if ( !m_mapEventers.contains( std::type_index(typeid( QDynamicEvents<Types...> )) ) )
+	{
+		m_mapEventers[std::type_index(typeid(QDynamicEvents<Types...>))] = new QDynamicEvents<Types...>;
+		qDebug() << "[INFO] Created eventer for type " << typeid(QDynamicEvents<Types...>).name();
+	}
+	return * (static_cast<QDynamicEvents<Types...> *>( m_mapEventers[std::type_index(typeid(QDynamicEvents<Types...>))] ));
 }
 
-template<typename T1, typename T2>
-QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(T1, T2)> callback)
+template<typename ...Types>
+QDynamicEventsHandle Derived::onAlias(QString strEventName, std::function<void(Types(&...args))> callback)
 {
-	return QDynamicEvents<T1, T2>::on(strEventName, callback);
+	return getEventer<Types...>().on(strEventName, callback);
 }
 
 template<typename ...Types>
 void Derived::trigger(QString strEventName, Types(...args))
 {
-	return QDynamicEvents<Types...>::trigger(strEventName, args...);
+	return getEventer<Types...>().trigger(strEventName, args...);
 }
 
 #endif // DERIVED_H
