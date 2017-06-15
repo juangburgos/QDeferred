@@ -1,6 +1,11 @@
 #ifndef DERIVED_H
 #define DERIVED_H
 
+#include <typeinfo>
+#include <typeindex>
+
+#include <QMap>
+#include <QScopedPointer>
 #include <QVariant>
 
 #include <QDynamicEvents>
@@ -9,6 +14,7 @@ class Derived
 {
 public:
 	Derived();
+	~Derived();
 
 	void    set_boolval(bool bVal);
 	bool    get_boolval();
@@ -36,6 +42,9 @@ private:
 	template<typename ...Types>
 	void trigger(QString strEventName, Types(...args));
 
+	// use combination of QMap and template function to emulate  variable templates
+	// http://en.cppreference.com/w/cpp/language/variable_template
+	QMap<std::type_index, QAbstractDynamicEvents*> m_mapEventers;
 	template<typename ...Types>
 	QDynamicEvents<Types...> getEventer();
 };
@@ -43,9 +52,13 @@ private:
 template<typename ...Types>
 QDynamicEvents<Types...> Derived::getEventer()
 {
-	// get only one eventer (static) for each types combination
-	static QDynamicEvents<Types...> s_eventer;
-	return s_eventer;
+	// create once eventer for each Types... (combination of types) used in code
+	if ( !m_mapEventers.contains( std::type_index(typeid( QDynamicEvents<Types...> )) ) )
+	{
+		m_mapEventers[std::type_index(typeid(QDynamicEvents<Types...>))] = new QDynamicEvents<Types...>;
+		qDebug() << "[INFO] Created eventer for type " << typeid(QDynamicEvents<Types...>).name();
+	}
+	return * (static_cast<QDynamicEvents<Types...> *>( m_mapEventers[std::type_index(typeid(QDynamicEvents<Types...>))] ));
 }
 
 template<typename ...Types>

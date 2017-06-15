@@ -8,8 +8,14 @@
 
 #include "qdynamiceventsdata.hpp"
 
+// base class just to be able to add different templated QDynamicEvents into a container
+class QAbstractDynamicEvents {
+//public:
+//	virtual ~QAbstractDynamicEvents() = 0;
+};
+
 template<class ...Types>
-class QDynamicEvents
+class QDynamicEvents: public QAbstractDynamicEvents
 {
 
 public:
