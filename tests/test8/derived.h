@@ -5,13 +5,7 @@
 
 #include <QDynamicEvents>
 
-class Derived :
-	public QDynamicEvents<bool>    ,
-	public QDynamicEvents<int>     ,
-	public QDynamicEvents<double>  ,
-	public QDynamicEvents<QString> ,
-	public QDynamicEvents<QVariant>,
-	public QDynamicEvents<QString, QVariant>
+class Derived
 {
 public:
 	Derived();
@@ -29,12 +23,9 @@ public:
 	QString get_stringval();
 
 	// NOTE : with variadic templates compiles but VS intellisense fails and marks with ulgy red
-	//template<typename ...Types>
-	//QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback);
-	template<typename T1>
-	QDynamicEventsHandle on(QString strEventName, std::function<void(T1)> callback);
-	template<typename T1, typename T2>
-	QDynamicEventsHandle on(QString strEventName, std::function<void(T1, T2)> callback);
+
+	template<typename ...Types>
+	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback);
 
 private:
 	bool    m_internalBool;
@@ -44,30 +35,29 @@ private:
 
 	template<typename ...Types>
 	void trigger(QString strEventName, Types(...args));
+
+	template<typename ...Types>
+	QDynamicEvents<Types...> getEventer();
 };
 
-//template<typename ...Types>
-//QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(Types(&...args))> callback)
-//{
-//	return QDynamicEvents<Types...>::on(strEventName, callback);
-//}
-
-template<typename T1>
-QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(T1)> callback)
+template<typename ...Types>
+QDynamicEvents<Types...> Derived::getEventer()
 {
-	return QDynamicEvents<T1>::on(strEventName, callback);
+	// get only one eventer (static) for each types combination
+	static QDynamicEvents<Types...> s_eventer;
+	return s_eventer;
 }
 
-template<typename T1, typename T2>
-QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(T1, T2)> callback)
+template<typename ...Types>
+QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(Types(&...args))> callback)
 {
-	return QDynamicEvents<T1, T2>::on(strEventName, callback);
+	return getEventer<Types...>().on(strEventName, callback);
 }
 
 template<typename ...Types>
 void Derived::trigger(QString strEventName, Types(...args))
 {
-	return QDynamicEvents<Types...>::trigger(strEventName, args...);
+	return getEventer<Types...>().trigger(strEventName, args...);
 }
 
 #endif // DERIVED_H

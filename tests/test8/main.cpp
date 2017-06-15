@@ -22,8 +22,6 @@ int main(int argc, char *argv[])
 	// init threads
 	QThread * pMainThread = QThread::currentThread();
 	qDebug() << "[INFO] Main thread = " << pMainThread;
-	QLambdaThreadWorker worker1;
-	qDebug() << "[INFO] Worker thread 1 = " << worker1.getThreadId();
 
 	Derived derived1;
 
