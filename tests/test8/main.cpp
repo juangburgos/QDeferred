@@ -52,6 +52,8 @@ int main(int argc, char *argv[])
 	derived1.set_doubleval(3.1416);
 	derived1.set_stringval("World");
 
+	// TODO : test in a loop
+
 	Derived derived2;
 
 	derived2.on<bool>("change:boolval", [](bool bVal) {

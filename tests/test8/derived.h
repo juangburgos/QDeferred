@@ -10,6 +10,8 @@
 
 #include <QDynamicEvents>
 
+// TODO : make a base class in order to add functionality by inheriting
+
 class Derived
 {
 public:
@@ -28,10 +30,11 @@ public:
 	void    set_stringval(QString strVal);
 	QString get_stringval();
 
-	// NOTE : with variadic templates compiles but VS intellisense fails and marks with ulgy red
-
-	template<typename ...Types>
-	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback);
+	// NOTE : inline below are useless, only to avoid intellisense ugly read
+	template<typename ...Types, typename T>
+	inline QDynamicEventsHandle on(QString strEventName, T callback) {
+		return onAlias<Types...>(strEventName, callback);
+	};
 
 private:
 	bool    m_internalBool;
@@ -42,8 +45,16 @@ private:
 	template<typename ...Types>
 	void trigger(QString strEventName, Types(...args));
 
-	// use combination of QMap and template function to emulate  variable templates
-	// http://en.cppreference.com/w/cpp/language/variable_template
+	// without alias would work, but annoying intellisense appears 
+	template<typename ...Types>
+	QDynamicEventsHandle onAlias(QString strEventName, std::function<void(Types(&...args))> callback);
+
+	/*
+	use combination of QMap and template function to emulate  variable templates
+	http://en.cppreference.com/w/cpp/language/variable_template
+	https://stackoverflow.com/questions/37912378/variable-templates-only-available-with-c14
+	http://en.cppreference.com/w/cpp/types/type_index
+	*/
 	QMap<std::type_index, QAbstractDynamicEvents*> m_mapEventers;
 	template<typename ...Types>
 	QDynamicEvents<Types...> getEventer();
@@ -62,7 +73,7 @@ QDynamicEvents<Types...> Derived::getEventer()
 }
 
 template<typename ...Types>
-QDynamicEventsHandle Derived::on(QString strEventName, std::function<void(Types(&...args))> callback)
+QDynamicEventsHandle Derived::onAlias(QString strEventName, std::function<void(Types(&...args))> callback)
 {
 	return getEventer<Types...>().on(strEventName, callback);
 }
