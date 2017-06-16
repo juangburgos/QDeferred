@@ -10,8 +10,12 @@
 
 // base class just to be able to add different templated QDynamicEvents into a container
 class QAbstractDynamicEvents {
-//public:
-//	virtual ~QAbstractDynamicEvents() = 0;
+public:
+	virtual void off(QString strEventName)           = 0;
+	virtual void off(QDynamicEventsHandle evtHandle) = 0;
+	virtual void off()                               = 0;
+
+	//static getCallbackId()
 };
 
 template<class ...Types>
@@ -40,6 +44,7 @@ public:
 
 	// provider API
 
+	// trigger event method
 	void trigger(QString strEventName, Types(&...args));
 
 protected:
@@ -82,17 +87,13 @@ QDynamicEvents<Types...>::~QDynamicEvents()
 template<class ...Types>
 QDynamicEventsHandle QDynamicEvents<Types...>::on(QString strEventName, std::function<void(Types(&...args))> callback)
 {
-	// NOTE need to create the handle here in order to make it unique
-	size_t evtHandle = (size_t)(&callback);
-	return m_data->on(strEventName, evtHandle, callback);
+	return m_data->on(strEventName, callback);
 }
 
 template<class ...Types>
 QDynamicEventsHandle QDynamicEvents<Types...>::once(QString strEventName, std::function<void(Types(&...args))> callback)
 {
-	// NOTE need to create the handle here in order to make it unique
-	size_t evtHandle = (size_t)(&callback);
-	return m_data->once(strEventName, evtHandle, callback);
+	return m_data->once(strEventName, callback);
 }
 
 template<class ...Types>

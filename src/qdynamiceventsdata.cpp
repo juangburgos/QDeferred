@@ -23,8 +23,9 @@ QDynamicEventsProxyEvent::QDynamicEventsProxyEvent() : QEvent(QDYNAMICEVENTSPROX
 }
 
 // define static members and methods of base class
-QMutex QDynamicEventsDataBase::s_mutex;
+QMutex                                         QDynamicEventsDataBase::s_mutex;
 QMap< QThread *, QDynamicEventsProxyObject * > QDynamicEventsDataBase::s_threadMap;
+qlonglong                                      QDynamicEventsDataBase::s_funcId = 0;
 
 QDynamicEventsProxyObject * QDynamicEventsDataBase::getObjectForThread(QThread * p_currThd)
 {
@@ -47,7 +48,7 @@ QDynamicEventsProxyObject * QDynamicEventsDataBase::getObjectForThread(QThread *
 	return s_threadMap[p_currThd];
 }
 
-QDynamicEventsHandle::QDynamicEventsHandle(QString strEventName, QThread * p_handleThread, size_t funcId)
+QDynamicEventsHandle::QDynamicEventsHandle(QString strEventName, QThread * p_handleThread, qlonglong funcId)
 {
 	m_strEventName  = strEventName;
 	mp_handleThread = p_handleThread;
