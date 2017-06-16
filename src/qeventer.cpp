@@ -7,6 +7,7 @@ QEventer::QEventer()
 
 QEventer::~QEventer()
 {
+	qDeleteAll(m_mapEventers);
 	m_mapEventers.clear();
 }
 

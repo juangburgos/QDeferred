@@ -19,8 +19,8 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-	for (int i = 0; i < 1000000; i++)
-	{
+	//for (int i = 0; i < 1000000; i++)
+	//{
 
 		QEventer eventer1;
 
@@ -28,19 +28,23 @@ int main(int argc, char *argv[])
 		eventer1.on<int>("change", [](int iVal) {
 			qDebug() << "[INFO] Event \"change\" with arg = " << iVal;
 		});
-		eventer1.on<float>("sorted", [](float fVal) {
+		eventer1.on<double>("sorted", [](double fVal) {
 			qDebug() << "[INFO] Event \"sorted\" with arg = " << fVal;
 		});
 		auto handle3 = eventer1.on<QString>("change sorted", [](QString strVal) {
 			qDebug() << "[INFO] Event \"change & sorted\" with arg = " << strVal;
 		});
+		eventer1.on<QString, QVariant>("custom", [](QString strVal, QVariant varVal) {
+			qDebug() << "[INFO] Event \"" << strVal << "\" with arg = " << varVal;
+		});
 
 		int     iVal = 666;
-		float   fVal = 3.1416;
+		double  fVal = 3.1416;
 		QString strVal = "hello";
 		eventer1.trigger<int>("change sorted", iVal);
-		eventer1.trigger<float>("change sorted", fVal);
+		eventer1.trigger<double>("change sorted", fVal);
 		eventer1.trigger<QString>("change sorted", strVal);
+		eventer1.trigger<QString, QVariant>("custom", "CUSTOM", "Hello World!");
 
 		eventer1.off("sorted");
 
@@ -48,12 +52,12 @@ int main(int argc, char *argv[])
 		fVal = 3.1416;
 		strVal = "WORLD";
 		eventer1.trigger<int>("change sorted", iVal);
-		eventer1.trigger<float>("change sorted", fVal);
+		eventer1.trigger<double>("change sorted", fVal);
 		eventer1.trigger<QString>("change sorted", strVal);
 
-		// do not block event loop
-		QCoreApplication::processEvents();
-	}
+	//	// do not block event loop
+	//	QCoreApplication::processEvents();
+	//}
 
     return a.exec();
 }

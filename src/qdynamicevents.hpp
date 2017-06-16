@@ -11,12 +11,15 @@
 // base class just to be able to add different templated QDynamicEvents into a container
 class QAbstractDynamicEvents {
 public:
+	virtual ~QAbstractDynamicEvents()                = 0;
 	virtual void off(QString strEventName)           = 0;
 	virtual void off(QDynamicEventsHandle evtHandle) = 0;
 	virtual void off()                               = 0;
-
-	//static getCallbackId()
 };
+
+// NOTE : must declare a virtual destruct, otherwise derived classes' destructors are not called
+//        in array of pointers ot base class (e.g. QEventer::~QEventer())
+inline QAbstractDynamicEvents::~QAbstractDynamicEvents() { }
 
 template<class ...Types>
 class QDynamicEvents: public QAbstractDynamicEvents
