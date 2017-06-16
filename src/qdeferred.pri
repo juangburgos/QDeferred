@@ -1,8 +1,11 @@
 CONFIG += c++11
+CONFIG -= flat
 
 INCLUDEPATH += $$PWD/
 
-HEADERS  += $$PWD/qdeferred.hpp            \
-            $$PWD/qdeferreddata.hpp
+OTHER_FILES  = QDeferred.natvis
 
-SOURCES  += $$PWD/qdeferreddata.cpp
+HEADERS     += $$PWD/qdeferred.hpp \
+               $$PWD/qdeferreddata.hpp
+
+SOURCES     += $$PWD/qdeferreddata.cpp

@@ -1,4 +1,5 @@
 CONFIG += c++11
+CONFIG -= flat
 
 INCLUDEPATH += $$PWD/
 
