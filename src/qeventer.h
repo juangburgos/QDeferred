@@ -44,7 +44,7 @@ public:
 	template<typename ...Types>
 	void trigger(QString strEventName, Types(...args));
 
-private:
+protected:
 	// without alias would work, but annoying intellisense appears 
 	template<typename ...Types>
 	QDynamicEventsHandle onAlias(QString strEventName, std::function<void(Types(&...args))> callback);
