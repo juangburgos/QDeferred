@@ -2,7 +2,13 @@
 
 QEventer::QEventer()
 {
+	// nothing to do here
+}
 
+QEventer::QEventer(const QEventer &other) :
+	m_mapEventers(other.m_mapEventers)
+{
+	// nothing to do here
 }
 
 QEventer::~QEventer()

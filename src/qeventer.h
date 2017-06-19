@@ -16,6 +16,7 @@ class QEventer
 public:
 	QEventer();
 	~QEventer();
+	QEventer(const QEventer &other);
 
 	// consumer API
 
