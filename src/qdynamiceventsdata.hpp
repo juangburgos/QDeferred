@@ -47,7 +47,8 @@ class QDynamicEventsData;
 // create a handle class to be able to remove event subscription
 class QDynamicEventsHandle
 {
-	QDynamicEventsHandle(QString strEventName, QThread * p_handleThread, qlonglong funcId);
+public:
+	QDynamicEventsHandle(QString strEventName = QString(), QThread * p_handleThread = nullptr, qlonglong funcId = -1);
 private:
 	// make friend, so it can access internal methods
 	template<class ...Types>
@@ -304,11 +305,15 @@ void QDynamicEventsData<Types...>::triggerInternal(QDynamicEvents<Types...> ref,
 	for (int i = 0; i < listThreads.count(); i++)
 	{
 		auto p_currThread = listThreads.at(i);
+		auto mapOnlyCallbacks = this->m_callbacksMap[strEventName][p_currThread];
+		if (m_callbacksMap.count() <= 0)
+		{
+			continue;
+		}
 		auto p_currObject = QDynamicEventsDataBase::getObjectForThread(p_currThread);
 		// create object in heap and assign function (event loop takes ownership and deletes it later)
 		QDynamicEventsProxyEvent * p_Evt = new QDynamicEventsProxyEvent;
 		// NOTE need to pass mapOnlyCallbacks as copy because if an off() gets execd before event loop resumes, callbacks will not be called
-		auto mapOnlyCallbacks = this->m_callbacksMap[strEventName][p_currThread];
 		p_Evt->m_eventFunc = [ref, mapOnlyCallbacks, args...]() mutable {
 			auto listHandles = mapOnlyCallbacks.keys();
 			for (int j = 0; j < listHandles.count(); j++)
@@ -329,11 +334,15 @@ void QDynamicEventsData<Types...>::triggerInternal(QDynamicEvents<Types...> ref,
 	for (int i = 0; i < listThreadsOnce.count(); i++)
 	{
 		auto p_currThread = listThreadsOnce.at(i);
+		auto mapOnlyCallbacksOnce = this->m_callbacksMapOnce[strEventName].take(p_currThread);
+		if (mapOnlyCallbacksOnce.count() <= 0)
+		{
+			continue;
+		}
 		auto p_currObject = QDynamicEventsDataBase::getObjectForThread(p_currThread);
 		// create object in heap and assign function (event loop takes ownership and deletes it later)
 		QDynamicEventsProxyEvent * p_Evt = new QDynamicEventsProxyEvent;
 		// NOTE below the difference is the 'take' method which ensures callbacks are only execd once
-		auto mapOnlyCallbacksOnce = this->m_callbacksMapOnce[strEventName].take(p_currThread);
 		p_Evt->m_eventFunc = [ref, mapOnlyCallbacksOnce, args...]() mutable {
 			auto listHandles = mapOnlyCallbacksOnce.keys();
 			for (int j = 0; j < listHandles.count(); j++)
