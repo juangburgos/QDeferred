@@ -69,7 +69,7 @@ QDynamicEvents<Types...> QEventer::getEventer()
 	if (!m_mapEventers.contains(std::type_index(typeid(QDynamicEvents<Types...>))))
 	{
 		m_mapEventers[std::type_index(typeid(QDynamicEvents<Types...>))] = new QDynamicEvents<Types...>;
-		qDebug() << "[INFO] Created eventer for type " << typeid(QDynamicEvents<Types...>).name();
+		//qDebug() << "[INFO] Created eventer for type " << typeid(QDynamicEvents<Types...>).name();
 	}
 	// dereference and return
 	return *(static_cast<QDynamicEvents<Types...> *>(m_mapEventers[std::type_index(typeid(QDynamicEvents<Types...>))]));
