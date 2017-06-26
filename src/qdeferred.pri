@@ -9,3 +9,5 @@ HEADERS     += $$PWD/qdeferred.hpp \
                $$PWD/qdeferreddata.hpp
 
 SOURCES     += $$PWD/qdeferreddata.cpp
+
+DEFINES     += QDEFERRED_USED
