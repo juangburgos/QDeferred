@@ -178,7 +178,6 @@ private:
 	std::vector<std::string> d_vecRejectList;
 	std::vector<std::string> d_vecNotifyList;
 #endif
-
 };
 
 template<class ...Types>
