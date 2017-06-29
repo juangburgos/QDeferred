@@ -22,6 +22,8 @@ public:
 
 	bool    stopLoopInThread(const int &intLoopId);
 
+	void    moveQObjectToThread(QObject * pObject);
+
 protected:
 	QExplicitlySharedDataPointer<QLambdaThreadWorkerData> m_data;
 

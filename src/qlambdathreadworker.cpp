@@ -44,3 +44,8 @@ bool QLambdaThreadWorker::stopLoopInThread(const int &intLoopId)
 {
 	return m_data->stopLoopInThread(intLoopId);
 }
+
+void QLambdaThreadWorker::moveQObjectToThread(QObject * pObject)
+{
+	m_data->moveQObjectToThread(pObject);
+}

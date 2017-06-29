@@ -56,6 +56,8 @@ public:
 	int     startLoopInThread(std::function<void()> &threadLoopFunc, int uiMsSleep = 1000);
 
 	bool    stopLoopInThread(const int &intLoopId);
+
+	void    moveQObjectToThread(QObject * pObject);
 	
 private:
 	QThread                       * mp_workerThread;

@@ -129,3 +129,8 @@ bool QLambdaThreadWorkerData::stopLoopInThread(const int &intLoopId)
 	// return success
 	return true;
 }
+
+void QLambdaThreadWorkerData::moveQObjectToThread(QObject * pObject)
+{
+	pObject->moveToThread(mp_workerThread);
+}
