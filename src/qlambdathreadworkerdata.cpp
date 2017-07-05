@@ -82,6 +82,11 @@ QString QLambdaThreadWorkerData::getThreadId()
 	return m_strThreadId;
 }
 
+QThread * QLambdaThreadWorkerData::getThread()
+{
+	return mp_workerThread;
+}
+
 int QLambdaThreadWorkerData::startLoopInThread(std::function<void()> &threadLoopFunc, int intMsSleep /*= 1000*/)
 {
 	// limit

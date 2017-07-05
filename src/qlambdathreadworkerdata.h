@@ -53,6 +53,8 @@ public:
 
 	QString getThreadId();
 
+	QThread * getThread();
+
 	int     startLoopInThread(std::function<void()> &threadLoopFunc, int uiMsSleep = 1000);
 
 	bool    stopLoopInThread(const int &intLoopId);

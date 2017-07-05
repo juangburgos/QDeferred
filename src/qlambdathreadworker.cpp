@@ -35,6 +35,11 @@ QString QLambdaThreadWorker::getThreadId()
 	return m_data->getThreadId();
 }
 
+QThread * QLambdaThreadWorker::getThread()
+{
+	return m_data->getThread();
+}
+
 int QLambdaThreadWorker::startLoopInThread(std::function<void()> threadLoopFunc, int uiMsSleep /*= 1000*/)
 {
 	return m_data->startLoopInThread(threadLoopFunc, uiMsSleep);
