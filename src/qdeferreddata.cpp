@@ -27,13 +27,24 @@ QDeferredProxyEvent::QDeferredProxyEvent() : QEvent(QDEFERREDPROXY_EVENT_TYPE)
 // define static members and methods of base class
 QMutex QDeferredDataBase::s_mutex;
 QMap< QThread *, QDeferredProxyObject * > QDeferredDataBase::s_threadMap;
+// TODO : use object below to clean static resource gracefully on exit
+QObject QDeferredDataBase::s_objExitCleaner;
 
 QDeferredProxyObject * QDeferredDataBase::getObjectForThread(QThread * p_currThd)
 {
+	static bool isFirstTime = true;
+	if (isFirstTime)
+	{
+		QObject::connect(&QDeferredDataBase::s_objExitCleaner, &QObject::destroyed, []() {
+			// TODO : cleanup possible connections from QThread::finished events below (used to crash)
+			qDebug() << "QDeferredDataBase was deleted.";
+		});
+		isFirstTime = false;
+	}
 	// lock multithread access
 	QMutexLocker locker(&QDeferredDataBase::s_mutex);
 	// if not in list then...
-	if (!s_threadMap.contains(p_currThd))
+	if (!QDeferredDataBase::s_threadMap.contains(p_currThd))
 	{
 		// subscribe to finish
 		QObject::connect(p_currThd, &QThread::finished, [p_currThd]() {
@@ -43,9 +54,9 @@ QDeferredProxyObject * QDeferredDataBase::getObjectForThread(QThread * p_currThd
 			p_objToDelete->deleteLater();
 		});
 		// add to all maps
-		s_threadMap[p_currThd] = new QDeferredProxyObject;
+		QDeferredDataBase::s_threadMap[p_currThd] = new QDeferredProxyObject;
 	}
 	// return
-	return s_threadMap[p_currThd];
+	return QDeferredDataBase::s_threadMap[p_currThd];
 }
 

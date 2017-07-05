@@ -66,6 +66,8 @@ protected:
 		whenInternal(doneCallback, failCallback, rest...);
 	}
 
+	static QObject s_objExitCleaner;
+
 	static QDeferredProxyObject * getObjectForThread(QThread * p_currThd);
 
 	static QMap< QThread *, QDeferredProxyObject * > s_threadMap;
