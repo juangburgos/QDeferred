@@ -289,7 +289,7 @@ Deferred as soon as one of the Deferreds is rejected.
 */
 template<class ...Types>
 template<class ...OtherTypes, class... Rest>
-static QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest)
+QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest)
 {
 	// setup necessary variables for expansion
 	QDefer retDeferred;

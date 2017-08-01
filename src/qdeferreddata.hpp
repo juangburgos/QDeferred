@@ -11,6 +11,8 @@
 #include <QObject>
 #include <QEvent>
 
+#include <QDebug>
+
 // custom event to be used in qt event loop for each thread
 #define QDEFERREDPROXY_EVENT_TYPE (QEvent::Type)(QEvent::User + 123)
 
