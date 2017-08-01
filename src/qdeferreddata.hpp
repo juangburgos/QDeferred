@@ -73,8 +73,16 @@ protected:
 	static QMap< QThread *, QDeferredProxyObject * > s_threadMap;
 
 	static QMutex s_mutex;
-
 };
+
+// [GCC_DEF_FIX]
+namespace GCC_DEF_FIX {
+	template<class ...Types>
+	void finishedFunctionTemplate(std::function<void(Types(&...args))> funcFinish, Types(&...args))
+	{
+		funcFinish(args...);
+	}
+}
 
 enum QDeferredState
 {
@@ -166,7 +174,7 @@ private:
 	QMutex         m_mutex;
 	QList<QMetaObject::Connection> m_connectionList;
 	// methods
-	void execute    (QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args));
+	void execute    (QList< std::function<void(Types(&...args))> > &listCallbacks);
 	void executeZero(QList< std::function<void()               > > &listCallbacks);
 	DeferredAllCallbacks * getCallbaksForThread();
 
@@ -346,9 +354,11 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 	d_state = "RESOLVED";
 #endif
 	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after resolve)
-	m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
-		callback(args...);
-	};
+	// [GCC_DEF_FIX] : below not working in GCC (https://stackoverflow.com/questions/18871122/compiler-bug-or-non-standard-code-variadic-template-capture-in-lambda)
+	//m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
+	//	callback(args...);
+	//};
+	m_finishedFunction = std::bind(GCC_DEF_FIX::finishedFunctionTemplate<Types...>, std::placeholders::_1, args...);
 
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
@@ -361,11 +371,11 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 		auto p_currCallbacks  = m_callbacksMap[p_currThread];
 		// create object in heap and assign function (event loop takes ownership and deletes it later)
 		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [ref, this, p_currCallbacks, args...]() mutable {
+		p_Evt->m_eventFunc = [ref, this, p_currCallbacks]() mutable {
 			// execute all done callbacks
-			this->execute(p_currCallbacks->m_doneList, args...); // DONE
+			this->execute(p_currCallbacks->m_doneList); // DONE
 			// execute all then callbacks
-			this->execute(p_currCallbacks->m_thenList, args...); // THEN
+			this->execute(p_currCallbacks->m_thenList); // THEN
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_doneZeroList);  // DONE
 			// clear callbacks since wont be used again, except progress because it can be used continously
@@ -399,9 +409,12 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 	d_state = "REJECTED";
 #endif
 	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after reject)
-	m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
-		callback(args...);
-	};
+	// [GCC_DEF_FIX] : below not working in GCC (https://stackoverflow.com/questions/18871122/compiler-bug-or-non-standard-code-variadic-template-capture-in-lambda)
+	//m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
+	//	callback(args...);
+	//};
+	m_finishedFunction = std::bind(GCC_DEF_FIX::finishedFunctionTemplate<Types...>, std::placeholders::_1, args...);
+
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
 	while (i.hasNext())
@@ -413,11 +426,11 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 		auto p_currCallbacks = m_callbacksMap[p_currThread];
 		// create object in heap and assign function (event loop takes ownership and deletes it later)
 		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [ref, this, p_currCallbacks, args...]() mutable {
+		p_Evt->m_eventFunc = [ref, this, p_currCallbacks]() mutable {
 			// execute all done callbacks
-			this->execute(p_currCallbacks->m_failList, args...); // FAIL
+			this->execute(p_currCallbacks->m_failList); // FAIL
 			// execute all then callbacks
-			this->execute(p_currCallbacks->m_thenList, args...); // THEN
+			this->execute(p_currCallbacks->m_thenList); // THEN
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_failZeroList);  // FAIL
 			// clear callbacks since wont be used again, except progress because it can be used continously
@@ -445,6 +458,10 @@ void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 		qWarning() << "Cannot notify already processed deferred object.";
 		return;
 	}
+
+	// [GCC_DEF_FIX] before there was no need of this, but since GCC incompatibility now there is need
+	m_finishedFunction = std::bind(GCC_DEF_FIX::finishedFunctionTemplate<Types...>, std::placeholders::_1, args...);
+
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
 	while (i.hasNext())
@@ -456,9 +473,9 @@ void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 		auto p_currCallbacks = m_callbacksMap[p_currThread];
 		// create object in heap and assign function (event loop takes ownership and deletes it later)
 		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [ref, this, p_currCallbacks, args...]() mutable {
+		p_Evt->m_eventFunc = [ref, this, p_currCallbacks]() mutable {
 			// execute all done callbacks
-			this->execute(p_currCallbacks->m_progressList, args...); // PROGRESS
+			this->execute(p_currCallbacks->m_progressList); // PROGRESS
 			Q_UNUSED(ref)
 		};
 		// post event for object with correct thread affinity
@@ -496,13 +513,15 @@ void QDeferredData<Types...>::notifyVsDbg_Impl(QString &strVsDbg, QDeferred<Type
 #endif // defined(QT_DEBUG) && defined(Q_OS_WIN)
 
 template<class ...Types>
-void QDeferredData<Types...>::execute(QList< std::function<void(Types(&...args))> > &listCallbacks, Types(&...args))
+void QDeferredData<Types...>::execute(QList< std::function<void(Types(&...args))> > &listCallbacks)
 {
 	// loop all callbacks
 	for (int i = 0; i < listCallbacks.length(); i++)
 	{
 		// call each callback with arguments
-		listCallbacks.at(i)(args...);
+		m_finishedFunction(listCallbacks.at(i));
+		// [GCC_DEF_FIX] Code below not working due to GCC lambda-variadic_templates incompatibility, 
+		//listCallbacks.at(i)(args...);	
 	}
 }
 

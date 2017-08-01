@@ -13,3 +13,5 @@ HEADERS  += threadworker.h
 
 SOURCES += main.cpp \
            threadworker.cpp
+
+include(./../add_qt_path.pri)
