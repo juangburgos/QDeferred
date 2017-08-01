@@ -150,10 +150,11 @@ public:
 
 private:
 	// structure to contain callbacks (one instance per thread in m_callbacksMap)
-	struct DeferredAllCallbacks {
-		QList< std::function<void(Types(&...args))> > m_doneList;
-		QList< std::function<void(Types(&...args))> > m_failList;
-		QList< std::function<void(Types(&...args))> > m_thenList;
+	struct DeferredAllCallbacks 
+	{
+		QList< std::function<void(Types(&...args))> > m_doneList    ;
+		QList< std::function<void(Types(&...args))> > m_failList    ;
+		QList< std::function<void(Types(&...args))> > m_thenList    ;
 		QList< std::function<void(Types(&...args))> > m_progressList;
 		QList< std::function<void()               > > m_doneZeroList;
 		QList< std::function<void()               > > m_failZeroList;
@@ -225,45 +226,60 @@ QDeferredState QDeferredData<Types...>::state()
 template<class ...Types>
 void QDeferredData<Types...>::done(std::function<void(Types(&...args))> callback)
 {
-	// add object for thread if does not exists
-	auto p_callbacks = this->getCallbaksForThread();
-	// append to done callbacks list
-	p_callbacks->m_doneList.append(callback);
 	// call it inmediatly if already resolved
 	QMutexLocker locker(&m_mutex);
 	if (m_state == QDeferredState::RESOLVED)
 	{
 		m_finishedFunction(callback);
 	}
+	else
+	{
+		// unlock to avoid deadlock in getCallbaksForThread call
+		locker.unlock();
+		// add object for thread if does not exists
+		auto p_callbacks = this->getCallbaksForThread();
+		// append to done callbacks list
+		p_callbacks->m_doneList.append(callback);
+	}
 }
 
 template<class ...Types>
 void QDeferredData<Types...>::fail(std::function<void(Types(&...args))> callback)
 {
-	// add object for thread if does not exists
-	auto p_callbacks = this->getCallbaksForThread();
-	// append to fail callbacks list
-	p_callbacks->m_failList.append(callback);
 	// call it inmediatly if already rejected
 	QMutexLocker locker(&m_mutex);
 	if (m_state == QDeferredState::REJECTED)
 	{
 		m_finishedFunction(callback);
 	}
+	else
+	{
+		// unlock to avoid deadlock in getCallbaksForThread call
+		locker.unlock();
+		// add object for thread if does not exists
+		auto p_callbacks = this->getCallbaksForThread();
+		// append to fail callbacks list
+		p_callbacks->m_failList.append(callback);
+	}
 }
 
 template<class ...Types>
 void QDeferredData<Types...>::then(std::function<void(Types(&...args))> callback)
 {
-	// add object for thread if does not exists
-	auto p_callbacks = this->getCallbaksForThread();
-	// append to then callbacks list
-	p_callbacks->m_thenList.append(callback);
 	// call it inmediatly if already resolved or rejected
 	QMutexLocker locker(&m_mutex);
 	if (m_state == QDeferredState::RESOLVED || m_state == QDeferredState::REJECTED)
 	{
 		m_finishedFunction(callback);
+	}
+	else
+	{
+		// unlock to avoid deadlock in getCallbaksForThread call
+		locker.unlock();
+		// add object for thread if does not exists
+		auto p_callbacks = this->getCallbaksForThread();
+		// append to then callbacks list
+		p_callbacks->m_thenList.append(callback);
 	}
 }
 
@@ -301,7 +317,7 @@ void QDeferredData<Types...>::thenVsDbg_Impl(QString &strVsDbg, std::function<vo
 	// store
 	d_vecThenList.push_back(strVsDbg.toStdString());
 	// call original
-	this->done(callback);
+	this->then(callback);
 }
 
 template<class ...Types>
@@ -352,6 +368,13 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 			this->execute(p_currCallbacks->m_thenList, args...); // THEN
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_doneZeroList);  // DONE
+			// clear callbacks since wont be used again, except progress because it can be used continously
+			p_currCallbacks->m_doneList    .clear();
+			p_currCallbacks->m_failList    .clear();
+			p_currCallbacks->m_thenList    .clear();
+			//p_currCallbacks->m_progressList.clear(); // NOTE
+			p_currCallbacks->m_doneZeroList.clear();
+			p_currCallbacks->m_failZeroList.clear();
 			// unused, but we need it to keep at least one reference until all callbacks are executed
 			Q_UNUSED(ref)
 		};
@@ -397,6 +420,13 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 			this->execute(p_currCallbacks->m_thenList, args...); // THEN
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_failZeroList);  // FAIL
+			// clear callbacks since wont be used again, except progress because it can be used continously
+			p_currCallbacks->m_doneList    .clear();
+			p_currCallbacks->m_failList    .clear();
+			p_currCallbacks->m_thenList    .clear();
+			//p_currCallbacks->m_progressList.clear(); // NOTE
+			p_currCallbacks->m_doneZeroList.clear();
+			p_currCallbacks->m_failZeroList.clear();
 			// unused, but we need it to keep at least one reference until all callbacks are executed
 			Q_UNUSED(ref)
 		};
@@ -479,28 +509,40 @@ void QDeferredData<Types...>::execute(QList< std::function<void(Types(&...args))
 template<class ...Types>
 void QDeferredData<Types...>::doneZero(std::function<void()> callback)
 {
-	// add object for thread if does not exists
-	auto p_callbacks = this->getCallbaksForThread();
-	// append to done zero callbacks list
-	p_callbacks->m_doneZeroList.append(callback);
 	// call it inmediatly if already resolved
+	QMutexLocker locker(&m_mutex);
 	if (m_state == QDeferredState::RESOLVED)
 	{
 		callback();
+	}
+	else
+	{
+		// unlock to avoid deadlock in getCallbaksForThread call
+		locker.unlock();
+		// add object for thread if does not exists
+		auto p_callbacks = this->getCallbaksForThread();
+		// append to done zero callbacks list
+		p_callbacks->m_doneZeroList.append(callback);
 	}
 }
 
 template<class ...Types>
 void QDeferredData<Types...>::failZero(std::function<void()> callback)
 {
-	// add object for thread if does not exists
-	auto p_callbacks = this->getCallbaksForThread();
-	// append to fail zero callbacks list
-	p_callbacks->m_failZeroList.append(callback);
 	// call it inmediatly if already rejected
+	QMutexLocker locker(&m_mutex);
 	if (m_state == QDeferredState::REJECTED)
 	{
 		callback();
+	}
+	else
+	{
+		// unlock to avoid deadlock in getCallbaksForThread call
+		locker.unlock();
+		// add object for thread if does not exists
+		auto p_callbacks = this->getCallbaksForThread();
+		// append to fail zero callbacks list
+		p_callbacks->m_failZeroList.append(callback);
 	}
 }
 

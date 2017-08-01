@@ -18,17 +18,6 @@ http://www.cprogramming.com/c++11/c++11-lambda-closures.html
 [this]	    Capture the this pointer of the enclosing class
 */
 
-// TODO : make thread safe!
-/*
-An idea is to keep an internal QMap<QThread, QObject>, one QObject per thread
-then assign each std::function to its own thread (QObject).
-When the deferred is either resolved or rejected, then post an special event
-to each of the objects with the arguments.
-Then in the QObject overwrite the event method to execute its own std::function's
-that will be executed in the QObject's thread affinity due to Qt's event loop.
-(hopefully)
-*/
-
 void testShared(QDeferred<int, double> def) 
 {
 	qDebug() << "[INFO] Called testShared ";
@@ -125,14 +114,7 @@ int main(int argc, char *argv[])
 		qDebug() << "[DEF5] Thenned.";
 	});
 
-	//// setup WHEN test
-	//QList<QDeferred<>> listDeferred;
-	//listDeferred.append(deferred4);
-	//listDeferred.append(deferred5);
-	//when(listDeferred).done([]() {
-	//	// print finished
-	//	qDebug() << "[INFO] Deferred 4 and 5 Resolved.";
-	//});
+
 
 	// asynch resolve of deferred 1
 	QTimer::singleShot(2000, [&]() {
