@@ -34,7 +34,7 @@ public:
 	QDeferred<Types...> progress(std::function<void(Types(&...args))> callback);
 
 	// wrapper consumer visual studio debug API (native visualizations)
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 	// debug done method	
 	QDeferred<Types...> doneVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
 	// debug fail method
@@ -60,7 +60,7 @@ public:
 	void notify(Types(&...args));
 
 	// wrapper provider visual studio debug API (native visualizations)
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 	// debug resolve method
 	void resolveVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, Types(&...args));
 	// debug reject method
@@ -90,7 +90,7 @@ private:
 	void failZero(std::function<void()> callback);
 
 	// debug helpers for visual studio debug API (native visualizations)
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 	QString createVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd);
 #endif
 };
@@ -98,7 +98,7 @@ private:
 // alias for no argument types
 using QDefer = QDeferred<>;
 
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 template<class ...Types>
 inline QString QDeferred<Types...>::createVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd)
 {
@@ -181,7 +181,7 @@ QDeferred<Types...> QDeferred<Types...>::progress(std::function<void(Types(&...a
 	return *this;
 }
 
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::doneVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
 {
@@ -240,7 +240,7 @@ void QDeferred<Types...>::notify(Types(&...args))
 	m_data->notify(*this, args...);
 }
 
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 #include <sstream>
 
 template<class ...Types>
@@ -325,7 +325,7 @@ int QDeferred<Types...>::getWhenCount()
 	return m_data->m_whenCount;
 }
 
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 #define doneVsDbg(...)     doneVsDbg_Impl    (__FILE__,__FUNCTION__,__LINE__, QThread::currentThread(), __VA_ARGS__)
 #define failVsDbg(...)     failVsDbg_Impl    (__FILE__,__FUNCTION__,__LINE__, QThread::currentThread(), __VA_ARGS__)
 #define thenVsDbg(...)     thenVsDbg_Impl    (__FILE__,__FUNCTION__,__LINE__, QThread::currentThread(), __VA_ARGS__)

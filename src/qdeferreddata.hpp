@@ -118,7 +118,7 @@ public:
 	void progress(std::function<void(Types(&...args))> callback);
 
 	// consumer visual studio debug API (native visualizations)
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 	// debug done method	
 	void doneVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback);
 	// debug fail method
@@ -139,7 +139,7 @@ public:
 	void notify(QDeferred<Types...> ref, Types(&...args));
 
 	// provider visual studio debug API (native visualizations)
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 	// debug resolve method
 	void resolveVsDbg_Impl(QString &strVsDbg, QDeferred<Types...> ref, Types(&...args));
 	// debug reject method
@@ -181,7 +181,7 @@ private:
 	DeferredAllCallbacks * getCallbaksForThread();
 
 	// debug helpers for visual studio debug API (native visualizations)
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 	std::string d_state;
 	std::vector<std::string> d_vecDoneList;
 	std::vector<std::string> d_vecFailList;
@@ -197,7 +197,7 @@ template<class ...Types>
 QDeferredData<Types...>::QDeferredData()
 {
 	m_state = QDeferredState::PENDING;
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 	d_state = "PENDING";
 #endif
 }
@@ -302,7 +302,7 @@ void QDeferredData<Types...>::progress(std::function<void(Types(&...args))> call
 	p_callbacks->m_progressList.append(callback);
 }
 
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 template<class ...Types>
 void QDeferredData<Types...>::doneVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback)
 {
@@ -352,7 +352,7 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 	}
 	// change state
 	m_state = QDeferredState::RESOLVED;
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 	d_state = "RESOLVED";
 #endif
 	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after resolve)
@@ -407,7 +407,7 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 	}
 	// change state
 	m_state = QDeferredState::REJECTED;
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 	d_state = "REJECTED";
 #endif
 	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after reject)
@@ -485,7 +485,7 @@ void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 	}
 }
 
-#if defined(QT_DEBUG) && defined(Q_OS_WIN)
+#if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
 template<class ...Types>
 void QDeferredData<Types...>::resolveVsDbg_Impl(QString &strVsDbg, QDeferred<Types...> ref, Types(&...args))
 {
