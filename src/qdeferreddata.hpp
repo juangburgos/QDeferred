@@ -345,11 +345,12 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 {
 	QMutexLocker locker(&m_mutex);
 	// early exit if deferred has been already resolved or rejected
-	if (m_state != QDeferredState::PENDING)
-	{
-		qWarning() << "Cannot resolve already processed deferred object.";
-		return;
-	}
+	Q_ASSERT_X(m_state == QDeferredState::PENDING, "QDeferred", "Cannot resolve already processed deferred object.");
+	//if (m_state != QDeferredState::PENDING)
+	//{
+	//	qWarning() << "Cannot resolve already processed deferred object.";
+	//	return;
+	//}
 	// change state
 	m_state = QDeferredState::RESOLVED;
 #if defined(QT_DEBUG) && defined(Q_OS_WIN) && defined(JS_DEBUG)
