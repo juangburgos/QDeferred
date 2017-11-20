@@ -43,7 +43,7 @@ QDeferredProxyObject * QDeferredDataBase::getObjectForThread(QThread * p_currThd
 	}
 	// lock multithread access
 	QMutexLocker locker(&QDeferredDataBase::s_mutex);
-	// if not in list then...
+	// if not in list...
 	if (!QDeferredDataBase::s_threadMap.contains(p_currThd))
 	{
 		// subscribe to finish

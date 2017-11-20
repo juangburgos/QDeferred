@@ -266,3 +266,5 @@ FakesAssemblies/
 /doc/manual/*.tmptarg
 /src/resources/docs
 /src/resources/mongoose.conf
+/tests/*.db
+/tests/*.opendb

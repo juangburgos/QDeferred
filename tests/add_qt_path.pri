@@ -1,3 +1,6 @@
+# ADD CATCH
+INCLUDEPATH += $$PWD/catch1
+# ADD BIN DIRS FOR WINDOWS
 # test if windows
 win32 {
   # test if already exists

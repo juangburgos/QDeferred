@@ -1,178 +1,317 @@
 #include <QCoreApplication>
 #include <QTimer>
 #include <QDebug>
-
+#include <QDir>
 #include <QList>
 #include <QVariant>
 
 #include <QDeferred>
 
-/*
-LAMBDA CAPTURE
-http://www.cprogramming.com/c++11/c++11-lambda-closures.html
-[]	        Capture nothing (or, a scorched earth strategy?)
-[&]	        Capture any referenced variable by reference
-[=]	        Capture any referenced variable by making a copy
-[=, &foo]	Capture any referenced variable by making a copy, but capture variable foo by reference
-[bar]	    Capture bar by making a copy; don't copy anything else
-[this]	    Capture the this pointer of the enclosing class
-*/
+#define CATCH_CONFIG_RUNNER
+#include "catch.hpp"
 
-void testShared(QDeferred<int, double> def) 
+int main(int argc, char* argv[])
 {
-	qDebug() << "[INFO] Called testShared ";
-	// setup deferred 3
-	def.doneVsDbg([=](int i, double d) {
-		// print args
-		qDebug() << "[DEF3] testShared i = " << i << ".";
-		qDebug() << "[DEF3] testShared d = " << d << ".";
-	});
+	// global setup...
+	QCoreApplication a(argc, argv);
+
+	int result = Catch::Session().run(argc, argv);
+
+	// global clean-up...
+
+	return (result < 0xff ? result : 0xff);
 }
 
-int main(int argc, char *argv[])
+TEST_CASE("Should call done callback after resolve called", "[done][resolve]")
 {
-    QCoreApplication a(argc, argv);
-
-	QDeferred<QList<QVariant>>          deferred1;
-	QDeferred<QList<QVariant>, QString> deferred2;
-	QDeferred<int, double>              deferred3;
-	QDefer deferred4;
-	QDefer deferred5;
-
-	QDefer::when(deferred1, deferred4, deferred5)
-	  .doneVsDbg([]() {
-		qDebug() << "[INFO] First when has done.";
-	}).failVsDbg([]() {
-		qDebug() << "[INFO] First when has failed.";
-	}).thenVsDbg([]() {
-		qDebug() << "[INFO] First when has thened.";
+	// init
+	QDefer defer;
+	// subscribe done callback
+	defer.done([]() {
+		// test called
+		REQUIRE(true);
 	});
+	// resolve
+	defer.resolve();
 
-	QDefer::when(deferred2, deferred3, deferred4)
-	  .doneVsDbg([]() {
-		qDebug() << "[INFO] Second when has done.";
-	}).failVsDbg([]() {
-		qDebug() << "[INFO] Second when has failed.";
-	}).thenVsDbg([]() {
-		qDebug() << "[INFO] Second when has thenned.";
-	});
-
-	qDebug() << "[INFO] deferred1.state() = " << deferred1.state();
-	qDebug() << "[INFO] deferred2.state() = " << deferred2.state();
-	qDebug() << "[INFO] deferred3.state() = " << deferred3.state();
-	qDebug() << "[INFO] deferred4.state() = " << deferred4.state();
-	qDebug() << "[INFO] deferred5.state() = " << deferred5.state();
-
-	// setup deferred 1
-	deferred1.doneVsDbg([=](QList<QVariant> listArgs) {
-		// print args
-		for (int i = 0; i < listArgs.length(); i++)
-		{
-			qDebug() << "[DEF1] Argument " << i << " = " << listArgs.at(i) << ".";
-		}
-	}).doneVsDbg([=](QList<QVariant> listArgs) {
-		// print finished
-		qDebug() << "[DEF1] Resolved.";
-	});
-
-	// setup deferred 2
-	deferred2.failVsDbg([=](QList<QVariant> listArgs, QString strMessage) {
-		// print args
-		for (int i = 0; i < listArgs.length(); i++)
-		{
-			qDebug() << "[DEF2] Argument " << i << " = " << listArgs.at(i) << ".";
-		}
-		qDebug() << "[DEF2] Message " << strMessage << ".";
-	}).failVsDbg([=](QList<QVariant> listArgs, QString strMessage) {
-		// print finished
-		qDebug() << "[DEF2] Failed.";
-	});
-
-	// setup deferred 3
-	deferred3.doneVsDbg([=](int i, double d) {
-		// print args
-		qDebug() << "[DEF3] Argument i = " << i << ".";
-		qDebug() << "[DEF3] Argument d = " << d << ".";
-	}).doneVsDbg([=](int i, double d) {
-		Q_UNUSED(i)
-		Q_UNUSED(d)
-		// print finished
-		qDebug() << "[DEF3] Resolved.";
-	});
-
-	testShared(deferred3);
-
-	// setup deferred 4
-	deferred4.doneVsDbg([=]() {
-		// print finished
-		qDebug() << "[DEF4] Resolved.";
-	});
-
-	// setup deferred 5
-	deferred5.thenVsDbg([=]() {
-		// print finished
-		qDebug() << "[DEF5] Thenned.";
-	});
-
-
-
-	// asynch resolve of deferred 1
-	QTimer::singleShot(2000, [&]() {
-		QList<QVariant> listArgs;
-		listArgs.append("Hello");
-		listArgs.append("World");
-		listArgs.append(12345);
-		// resolve
-		deferred1.resolveVsDbg(listArgs);
-		qDebug() << "[INFO] deferred1.state() = " << deferred1.state();
-	});
-
-	// asynch resolve of deferred 2
-	QTimer::singleShot(3000, [&]() {
-		QList<QVariant> listArgs;
-		listArgs.append("Hola");
-		listArgs.append("Mundo");
-		listArgs.append(6789);
-		// reject
-		QString strMessage("Que dices?");
-		deferred2.rejectVsDbg(listArgs, strMessage);
-		qDebug() << "[INFO] deferred2.state() = " << deferred2.state();
-	});
-
-	// asynch resolve of deferred 3
-	QTimer::singleShot(4000, [&]() {
-		// resolve
-		int    iNum = 666;
-		double dNum = 666.666;
-		deferred3.resolveVsDbg(iNum, dNum);
-		qDebug() << "[INFO] deferred3.state() = " << deferred3.state();
-		// call done again
-		deferred3.doneVsDbg([=](int i, double d) {
-			// print args
-			qDebug() << "[DEF3] After done i = " << i << ".";
-			qDebug() << "[DEF3] After done d = " << d << ".";
-		});
-	});
-
-	// asynch resolve of deferred 4
-	QTimer::singleShot(1000, [&]() {
-		// resolve
-		deferred4.resolveVsDbg();
-		qDebug() << "[INFO] deferred4.state() = " << deferred4.state();
-	});
-
-	// asynch resolve of deferred 5
-	QTimer::singleShot(1500, [&]() {
-		// resolve
-		deferred5.resolveVsDbg();
-		qDebug() << "[INFO] deferred5.state() = " << deferred5.state();
-		deferred5.doneVsDbg([=]() {
-			// print finished
-			qDebug() << "[DEF5] After done.";
-		});
-	});
-
-    return a.exec();
+	QCoreApplication::processEvents();
 }
 
+TEST_CASE("Should call fail callback after reject called", "[fail][reject]")
+{
+	//init
+	QDefer defer;
+	// subscribe fail callback
+	defer.fail([]() {
+		// test called
+		REQUIRE(true);
+	});
+	// reject
+	defer.reject();
 
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should change state from pending to resolved after resolve called", "[done][resolve][state]")
+{
+	// init
+	QDefer defer;
+	// test unresolved state
+	REQUIRE(defer.state() == QDeferredState::PENDING);
+	// subscribe done callback
+	defer.done([defer]() {
+		// test resolved state
+		REQUIRE(defer.state() == QDeferredState::RESOLVED);
+	});
+	// resolve
+	defer.resolve();
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should change state from pending to rejected after reject called", "[fail][reject][state]")
+{
+	// init
+	QDefer defer;
+	// test unresolved state
+	REQUIRE(defer.state() == QDeferredState::PENDING);
+	// subscribe fail callback
+	defer.fail([defer]() {
+		// test resolved state
+		REQUIRE(defer.state() == QDeferredState::REJECTED);
+	});
+	// reject
+	defer.reject();
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call done callback with simple argument after resolve called", "[done][resolve][args]")
+{
+	// init
+	QDeferred<int> defer;
+	int i = 123;
+	// subscribe done callback
+	defer.done([i](int val) {
+		// test called with argument
+		REQUIRE(i == val);
+	});
+	// resolve
+	defer.resolve(i);
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call fail callback with simple argument after reject called", "[fail][reject][args]")
+{
+	//init
+	QDeferred<int> defer;
+	int i = 123;
+	// subscribe fail callback
+	defer.fail([i](int val) {
+		// test called with argument
+		REQUIRE(i == val);
+	});
+	// reject
+	defer.reject(i);
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call done callback with complex argument after resolve called", "[done][resolve][args]")
+{
+	// init
+	QDeferred<QList<QVariant>> defer;
+	QList<QVariant> listArgs;
+	listArgs.append("Hello");
+	listArgs.append("World");
+	listArgs.append(12345);
+	// subscribe done callback
+	defer.done([listArgs](QList<QVariant> val) {
+		// test called with argument
+		REQUIRE(listArgs == val);
+	});
+	// resolve
+	defer.resolve(listArgs);
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call fail callback with complex argument after reject called", "[fail][reject][args]")
+{
+	//init
+	QDeferred<QList<QVariant>> defer;
+	QList<QVariant> listArgs;
+	listArgs.append("Hello");
+	listArgs.append("World");
+	listArgs.append(12345);
+	// subscribe fail callback
+	defer.fail([listArgs](QList<QVariant> val) {
+		// test called with argument
+		REQUIRE(listArgs == val);
+	});
+	// reject
+	defer.reject(listArgs);
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call done callbacks in the order they were registered", "[done][resolve][multi]")
+{
+	// init
+	QDefer defer;
+	int i = 0;
+	// subscribe done callbacks
+	defer.done([&i]() {
+		// test called in order
+		i++;
+		REQUIRE(i == 1);
+	}).done([&i]() {
+		// test called in order
+		i++;
+		REQUIRE(i == 2);
+	}).done([&i]() {
+		// test called in order
+		i++;
+		REQUIRE(i == 3);
+	});
+	// resolve
+	defer.resolve();
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call fail callbacks in the order they were registered", "[fail][reject][multi]")
+{
+	// init
+	QDefer defer;
+	int i = 0;
+	// subscribe fail callbacks
+	defer.fail([&i]() {
+		// test called in order
+		i++;
+		REQUIRE(i == 1);
+	}).fail([&i]() {
+		// test called in order
+		i++;
+		REQUIRE(i == 2);
+	}).fail([&i]() {
+		// test called in order
+		i++;
+		REQUIRE(i == 3);
+	});
+	// reject
+	defer.reject();
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call done callback when argument of deferred is another deferred", "[done][resolve][args]")
+{
+	// init
+	QDeferred<QDefer> deferOfDefer;
+	QDefer defer;
+	// subscribe done callback
+	defer.done([]() {
+		// test called
+		REQUIRE(true);
+	});
+	// subscribe done callback
+	deferOfDefer.done([](QDefer defer) {
+		// resolve
+		defer.resolve();
+	});
+	// resolve
+	deferOfDefer.resolve(defer);
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call done callback with argument when argument of deferred is another deferred", "[done][resolve][args]")
+{
+	// init
+	QDeferred<QDeferred<int>> deferOfDefer;
+	QDeferred<int> defer;
+	// subscribe done callback
+	defer.done([](int val) {
+		// test called
+		REQUIRE(val == 123);
+	});
+	// subscribe done callback
+	deferOfDefer.done([](QDeferred<int> defer) {
+		// resolve with argument
+		int i = 123;
+		defer.resolve(i);
+	});
+	// resolve
+	deferOfDefer.resolve(defer);
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call then resolved callback after resolve called", "[then][resolve]")
+{
+	// init
+	QDefer defer;
+	// subscribe then callback
+	defer.then([]() {
+		// test called
+		REQUIRE(true);
+	});
+	// resolve
+	defer.resolve();
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call then rejected callback after rejected called", "[then][reject]")
+{
+	// init
+	QDefer defer;
+	// subscribe then callback
+	defer.then([]() {
+		Q_ASSERT_X(false, 
+			"Should call then resolved callback after resolve called", 
+			"Resolve callback must be unreachable");
+	}, []() {
+		// test called
+		REQUIRE(true);
+	});
+	// reject
+	defer.reject();
+
+	QCoreApplication::processEvents();
+}
+
+TEST_CASE("Should call done callback of when deferred when all other deferreds resolve", "[when][done][resolve]")
+{
+	// init
+	QDefer defer1;
+	QDefer defer2;
+	QDefer defer3;
+	int i = 0;
+	// subscribe other deferreds to increment and prove order
+	defer1.done([&i]() {
+		i++;
+	});
+	defer2.done([&i]() {
+		i++;
+	});
+	defer3.done([&i]() {
+		i++;
+	});
+	// subscribe done callback of when
+	QDefer::when(defer1, defer2, defer3).done([&i]() {
+		// test called
+		REQUIRE(i == 3);
+	});
+	// resolve
+	defer1.resolve();
+	defer2.resolve();
+	defer3.resolve();
+
+	// NOTE : need to call twice ??
+	// TODO : find a way to empty event queue!
+	QCoreApplication::processEvents();
+	QCoreApplication::processEvents();
+}

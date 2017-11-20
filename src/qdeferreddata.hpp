@@ -112,8 +112,6 @@ public:
 	void done(std::function<void(Types (&...args))> callback); // by copy would be <Types... arg>
 	// fail method
 	void fail(std::function<void(Types(&...args))> callback);
-	// then method
-	void then(std::function<void(Types(&...args))> callback);
 	// progress method
 	void progress(std::function<void(Types(&...args))> callback);
 
@@ -123,8 +121,6 @@ public:
 	void doneVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback);
 	// debug fail method
 	void failVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback);
-	// debug then method
-	void thenVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback);
 	// debug progress method
 	void progressVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback);
 #endif
@@ -164,7 +160,6 @@ private:
 	{
 		QList< std::function<void(Types(&...args))> > m_doneList    ;
 		QList< std::function<void(Types(&...args))> > m_failList    ;
-		QList< std::function<void(Types(&...args))> > m_thenList    ;
 		QList< std::function<void(Types(&...args))> > m_progressList;
 		QList< std::function<void()               > > m_doneZeroList;
 		QList< std::function<void()               > > m_failZeroList;
@@ -185,7 +180,6 @@ private:
 	std::string d_state;
 	std::vector<std::string> d_vecDoneList;
 	std::vector<std::string> d_vecFailList;
-	std::vector<std::string> d_vecThenList;
 	std::vector<std::string> d_vecProgressList;
 	std::vector<std::string> d_vecResolveList;
 	std::vector<std::string> d_vecRejectList;
@@ -274,31 +268,11 @@ void QDeferredData<Types...>::fail(std::function<void(Types(&...args))> callback
 }
 
 template<class ...Types>
-void QDeferredData<Types...>::then(std::function<void(Types(&...args))> callback)
-{
-	// call it inmediatly if already resolved or rejected
-	QMutexLocker locker(&m_mutex);
-	if (m_state == QDeferredState::RESOLVED || m_state == QDeferredState::REJECTED)
-	{
-		m_finishedFunction(callback);
-	}
-	else
-	{
-		// unlock to avoid deadlock in getCallbaksForThread call
-		locker.unlock();
-		// add object for thread if does not exists
-		auto p_callbacks = this->getCallbaksForThread();
-		// append to then callbacks list
-		p_callbacks->m_thenList.append(callback);
-	}
-}
-
-template<class ...Types>
 void QDeferredData<Types...>::progress(std::function<void(Types(&...args))> callback)
 {
 	// add object for thread if does not exists
 	auto p_callbacks = this->getCallbaksForThread();
-	// append to then callbacks list
+	// append to progress callbacks list
 	p_callbacks->m_progressList.append(callback);
 }
 
@@ -319,15 +293,6 @@ void QDeferredData<Types...>::failVsDbg_Impl(QString &strVsDbg, std::function<vo
 	d_vecFailList.push_back(strVsDbg.toStdString());
 	// call original
 	this->fail(callback);
-}
-
-template<class ...Types>
-void QDeferredData<Types...>::thenVsDbg_Impl(QString &strVsDbg, std::function<void(Types(&...args))> callback)
-{
-	// store
-	d_vecThenList.push_back(strVsDbg.toStdString());
-	// call original
-	this->then(callback);
 }
 
 template<class ...Types>
@@ -377,14 +342,11 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 		p_Evt->m_eventFunc = [ref, this, p_currCallbacks]() mutable {
 			// execute all done callbacks
 			this->execute(p_currCallbacks->m_doneList); // DONE
-			// execute all then callbacks
-			this->execute(p_currCallbacks->m_thenList); // THEN
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_doneZeroList);  // DONE
 			// clear callbacks since wont be used again, except progress because it can be used continously
 			p_currCallbacks->m_doneList    .clear();
 			p_currCallbacks->m_failList    .clear();
-			p_currCallbacks->m_thenList    .clear();
 			//p_currCallbacks->m_progressList.clear(); // NOTE
 			p_currCallbacks->m_doneZeroList.clear();
 			p_currCallbacks->m_failZeroList.clear();
@@ -433,14 +395,11 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 		p_Evt->m_eventFunc = [ref, this, p_currCallbacks]() mutable {
 			// execute all done callbacks
 			this->execute(p_currCallbacks->m_failList); // FAIL
-			// execute all then callbacks
-			this->execute(p_currCallbacks->m_thenList); // THEN
 			// loop all done zero callbacks
 			this->executeZero(p_currCallbacks->m_failZeroList);  // FAIL
 			// clear callbacks since wont be used again, except progress because it can be used continously
 			p_currCallbacks->m_doneList    .clear();
 			p_currCallbacks->m_failList    .clear();
-			p_currCallbacks->m_thenList    .clear();
 			//p_currCallbacks->m_progressList.clear(); // NOTE
 			p_currCallbacks->m_doneZeroList.clear();
 			p_currCallbacks->m_failZeroList.clear();
@@ -588,7 +547,7 @@ typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>
 	QMutexLocker locker(&m_mutex);
 	// get current thread
 	QThread * p_currThd = QThread::currentThread();
-	// if not in list then...
+	// if not in list...
 	if (!m_callbacksMap.contains(p_currThd))
 	{
 		QDeferredProxyObject * p_obj = QDeferredDataBase::getObjectForThread(p_currThd);

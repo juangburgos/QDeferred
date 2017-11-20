@@ -22,14 +22,16 @@ public:
 	// wrapper consumer API (with chaning)
 
 	// get state method
-	QDeferredState state();
+	QDeferredState state() const;
 
 	// done method	
 	QDeferred<Types...> done(std::function<void(Types (&...args))> callback); // by copy would be <Types... arg>
 	// fail method
 	QDeferred<Types...> fail(std::function<void(Types(&...args))> callback);
 	// then method
-	QDeferred<Types...> then(std::function<void(Types(&...args))> callback);
+	QDeferred<Types...> then(std::function<void(Types(&...args))> doneCallback, 
+		                     std::function<void(Types(&...args))> failCallback     = std::function<void(Types(&...args))>(),
+		                     std::function<void(Types(&...args))> progressCallback = std::function<void(Types(&...args))>());
 	// progress method
 	QDeferred<Types...> progress(std::function<void(Types(&...args))> callback);
 
@@ -39,6 +41,7 @@ public:
 	QDeferred<Types...> doneVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
 	// debug fail method
 	QDeferred<Types...> failVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
+	// TODO : fix
 	// debug then method
 	QDeferred<Types...> thenVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
 	// debug progress method
@@ -148,7 +151,7 @@ QDeferred<Types...>::~QDeferred()
 }
 
 template<class ...Types>
-QDeferredState QDeferred<Types...>::state()
+QDeferredState QDeferred<Types...>::state() const
 {
 	return m_data->state();
 }
@@ -167,10 +170,31 @@ QDeferred<Types...> QDeferred<Types...>::fail(std::function<void(Types(&...args)
 	return *this;
 }
 
+// TODO : fix
+//template<class ...Types>
+//QDeferred<Types...> QDeferred<Types...>::then(std::function<void(Types(&...args))> callback)
+//{
+//	m_data->then(callback);
+//	return *this;
+//}
 template<class ...Types>
-QDeferred<Types...> QDeferred<Types...>::then(std::function<void(Types(&...args))> callback)
+QDeferred<Types...> QDeferred<Types...>::then(
+	std::function<void(Types(&...args))> doneCallback, 
+	std::function<void(Types(&...args))> failCallback     /*= std::function<void(Types(&...args))>()*/, 
+	std::function<void(Types(&...args))> progressCallback /*= std::function<void(Types(&...args))>()*/)
 {
-	m_data->then(callback);
+	// done callback is mandatory
+	m_data->done(doneCallback);
+	// check if valid
+	if (failCallback)
+	{
+		m_data->fail(failCallback);
+	}
+	// check if valid
+	if (progressCallback)
+	{
+		m_data->progress(progressCallback);
+	}
 	return *this;
 }
 
@@ -200,6 +224,7 @@ QDeferred<Types...> QDeferred<Types...>::failVsDbg_Impl(const char *file, const 
 	return *this;
 }
 
+// TODO : fix
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::thenVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
 {
