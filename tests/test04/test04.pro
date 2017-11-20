@@ -1,14 +1,13 @@
-
 QT += core
 QT -= gui
 
-TARGET  = test9
+TARGET = test04
 CONFIG += console
 CONFIG -= app_bundle
 
-include(./../../src/qdynamicevents.pri)
+include(./../../src/qdeferred.pri)
 include(./../../src/qlambdathreadworker.pri)
 
 TEMPLATE = app
 
-SOURCES += main.cpp \
+SOURCES  += main.cpp \

@@ -2,7 +2,7 @@
 QT += core
 QT -= gui
 
-TARGET  = test6
+TARGET  = test06
 CONFIG += console
 CONFIG -= app_bundle
 

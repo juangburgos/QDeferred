@@ -2,7 +2,7 @@
 QT += core
 QT -= gui
 
-TARGET = test5
+TARGET  = test08
 CONFIG += console
 CONFIG -= app_bundle
 
@@ -11,4 +11,7 @@ include(./../../src/qlambdathreadworker.pri)
 
 TEMPLATE = app
 
-SOURCES  += main.cpp \
+HEADERS += derived.h \
+
+SOURCES += main.cpp \
+           derived.cpp
