@@ -272,40 +272,6 @@ TEST_CASE("Should call done callback with argument when argument of deferred is 
 	QT_PROCESS_ALL_EVENTS
 }
 
-TEST_CASE("Should call then resolved callback after resolve called", "[then][resolve]")
-{
-	// init
-	QDefer defer;
-	// subscribe then callback
-	defer.then([]() {
-		// test called
-		REQUIRE(true);
-	});
-	// resolve
-	defer.resolve();
-
-	QT_PROCESS_ALL_EVENTS
-}
-
-TEST_CASE("Should call then rejected callback after rejected called", "[then][reject]")
-{
-	// init
-	QDefer defer;
-	// subscribe then callback
-	defer.then([]() {
-		Q_ASSERT_X(false, 
-			"Should call then resolved callback after resolve called", 
-			"Resolve callback must be unreachable");
-	}, []() {
-		// test called
-		REQUIRE(true);
-	});
-	// reject
-	defer.reject();
-
-	QT_PROCESS_ALL_EVENTS
-}
-
 TEST_CASE("Should call progress callback after notify called", "[progress][notify]")
 {
 	// init
@@ -403,8 +369,8 @@ TEST_CASE("Should call done callback of when deferred when all deferreds of diff
 	QDeferred<int>            defer1;
 	QDeferred<double>         defer2;
 	QDeferred<QList<QString>> defer3;
-	int            i    = 0;
-	double         d    = 3.1416;
+	int            i = 0;
+	double         d = 3.1416;
 	QList<QString> list = QList<QString>() << "one" << "two" << "three";
 	// subscribe other deferreds to increment and prove order
 	defer1.done([&i](int iVal) {
@@ -431,3 +397,74 @@ TEST_CASE("Should call done callback of when deferred when all deferreds of diff
 
 	QT_PROCESS_ALL_EVENTS
 }
+
+TEST_CASE("Should call then resolved callback after resolve called", "[then][resolve]")
+{
+	// init
+	QDefer defer1;
+	// subscribe then callback
+	defer1.then<int>([]() {
+		QDeferred<int> defer2;
+		// test called
+		REQUIRE(true);
+		// return deferred
+		return defer2;
+	});
+	// resolve
+	defer1.resolve();
+
+	QT_PROCESS_ALL_EVENTS
+}
+
+TEST_CASE("Should call chained then resolved callback after resolve called", "[then][resolve][chain]")
+{
+	// init
+	QDefer defer1;
+	// subscribe then callback
+	defer1.then<int>([]() {
+		QDeferred<int> defer2;
+		// test called
+		REQUIRE(true);
+		// resolve and return
+		int i = 123;
+		defer2.resolve(i);
+		return defer2;
+	}).then<double, QString>([](int val) {
+		QDeferred<double, QString> defer3;
+		// test called
+		REQUIRE(val == 123);
+		// resolve and return
+		double  d   = 3.141592;
+		QString str = "hello";
+		defer3.resolve(d, str);
+		return defer3;
+	}).done([](double val, QString str) { // NOTE : call 'done' at the end of the chain
+		// test called
+		REQUIRE(val == 3.141592);
+		REQUIRE(str == QString("hello"));
+	});
+	// resolve
+	defer1.resolve();
+
+	QT_PROCESS_ALL_EVENTS
+}
+
+//TEST_CASE("Should call then rejected callback after rejected called", "[then][reject]")
+//{
+//	// init
+//	QDefer defer;
+//	// subscribe then callback
+//	defer.then<void>([]() {
+//		Q_ASSERT_X(false, 
+//			"Should call then resolved callback after resolve called", 
+//			"Resolve callback must be unreachable");
+//	}, []() {
+//		// test called
+//		REQUIRE(true);
+//	});
+//	// reject
+//	defer.reject();
+//
+//	QT_PROCESS_ALL_EVENTS
+//}
+

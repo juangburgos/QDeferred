@@ -25,13 +25,23 @@ public:
 	QDeferredState state() const;
 
 	// done method	
-	QDeferred<Types...> done(std::function<void(Types (&...args))> callback); // by copy would be <Types... arg>
+	QDeferred<Types...> done(std::function<void(Types(&...args))> callback); // by copy would be <Types... arg>
+
 	// fail method
 	QDeferred<Types...> fail(std::function<void(Types(&...args))> callback);
+
+	
+
 	// then method
-	QDeferred<Types...> then(std::function<void(Types(&...args))> doneCallback, 
-		                     std::function<void(Types(&...args))> failCallback     = std::function<void(Types(&...args))>(),
-		                     std::function<void(Types(&...args))> progressCallback = std::function<void(Types(&...args))>());
+	template<class ...RetTypes, typename T>
+	inline QDeferred<RetTypes...> then(T doneCallback) {
+		return this->thenAlias<RetTypes...>(doneCallback);
+	};
+	template<class ...RetTypes>
+	QDeferred<RetTypes...> thenAlias(std::function<QDeferred<RetTypes...>(Types(&...args))> doneCallback);
+
+
+
 	// progress method
 	QDeferred<Types...> progress(std::function<void(Types(&...args))> callback);
 
@@ -43,7 +53,7 @@ public:
 	QDeferred<Types...> failVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
 	// TODO : fix
 	// debug then method
-	QDeferred<Types...> thenVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
+	//QDeferred<Types...> thenVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
 	// debug progress method
 	QDeferred<Types...> progressVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback);
 #endif
@@ -76,8 +86,8 @@ protected:
 	QExplicitlySharedDataPointer<QDeferredData<Types...>> m_data;
 
 private:
+	// friend classes
 
-	// friend class
 	friend class QDeferredDataBase;
 
 	// internal methods
@@ -170,33 +180,31 @@ QDeferred<Types...> QDeferred<Types...>::fail(std::function<void(Types(&...args)
 	return *this;
 }
 
-// TODO : fix
-//template<class ...Types>
-//QDeferred<Types...> QDeferred<Types...>::then(std::function<void(Types(&...args))> callback)
-//{
-//	m_data->then(callback);
-//	return *this;
-//}
 template<class ...Types>
-QDeferred<Types...> QDeferred<Types...>::then(
-	std::function<void(Types(&...args))> doneCallback, 
-	std::function<void(Types(&...args))> failCallback     /*= std::function<void(Types(&...args))>()*/, 
-	std::function<void(Types(&...args))> progressCallback /*= std::function<void(Types(&...args))>()*/)
+template<class ...RetTypes>
+QDeferred<RetTypes...> QDeferred<Types...>::thenAlias(
+	std::function<QDeferred<RetTypes...>(Types(&...args))> doneCallback)
 {
-	// done callback is mandatory
-	m_data->done(doneCallback);
 	// check if valid
-	if (failCallback)
-	{
-		m_data->fail(failCallback);
-	}
-	// check if valid
-	if (progressCallback)
-	{
-		m_data->progress(progressCallback);
-	}
-	return *this;
+	Q_ASSERT_X(doneCallback, "Deferred then method.", "Invalid done callback as first argument");
+
+	// create deferred to return
+	QDeferred<RetTypes...> retPromise;
+
+	// add intermediate callback
+	m_data->done([doneCallback, retPromise](Types(&...args1)) mutable {
+		// when done execute user callback, then when user deferred and when done...
+		doneCallback(args1...).done([retPromise](RetTypes(&...args2)) mutable {
+			// resolve returned deferred
+			retPromise.resolve(args2...);
+		});
+	});
+
+	// return new deferred
+	return retPromise;
 }
+
+
 
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::progress(std::function<void(Types(&...args))> callback)
@@ -225,14 +233,14 @@ QDeferred<Types...> QDeferred<Types...>::failVsDbg_Impl(const char *file, const 
 }
 
 // TODO : fix
-template<class ...Types>
-QDeferred<Types...> QDeferred<Types...>::thenVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
-{
-	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
-	// call debug version
-	m_data->thenVsDbg_Impl(strDbgInfo, callback);
-	return *this;
-}
+//template<class ...Types>
+//QDeferred<Types...> QDeferred<Types...>::thenVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
+//{
+//	QString strDbgInfo = createVsDbg_Impl(file, function, line, thnd);
+//	// call debug version
+//	m_data->thenVsDbg_Impl(strDbgInfo, callback);
+//	return *this;
+//}
 
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::progressVsDbg_Impl(const char *file, const char *function, const int line, QThread * thnd, std::function<void(Types(&...args))> callback)
