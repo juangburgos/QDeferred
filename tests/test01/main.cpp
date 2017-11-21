@@ -10,6 +10,21 @@
 #define CATCH_CONFIG_RUNNER
 #include "catch.hpp"
 
+// NOTE : * need to process all Qt events  manually at the end of every test
+//        because QDeferred works with the Qt event loop and Catch architecture
+//        doesn't seem to be well suited for testing code based on events.
+//        * that is why I also needed to provide a custom main() function, to
+//        be able to initialize the QCoreApplication.
+//        * furthermore, QCoreApplication::hasPendingEvents is obsolete and not
+//        thread-safe, neither are assertions in Catch.
+//        * in summary, although Catch is nice and simple, seems it won't
+//        scale for the task at hand.
+#define QT_PROCESS_ALL_EVENTS \
+while (QCoreApplication::hasPendingEvents()) \
+{ \
+QCoreApplication::processEvents(); \
+} 
+
 int main(int argc, char* argv[])
 {
 	// global setup...
@@ -30,11 +45,15 @@ TEST_CASE("Should call done callback after resolve called", "[done][resolve]")
 	defer.done([]() {
 		// test called
 		REQUIRE(true);
+	}).fail([]() {
+		Q_ASSERT_X(false,
+			"Should call done callback after resolve called",
+			"Reject callback must be unreachable");
 	});
 	// resolve
 	defer.resolve();
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call fail callback after reject called", "[fail][reject]")
@@ -45,11 +64,15 @@ TEST_CASE("Should call fail callback after reject called", "[fail][reject]")
 	defer.fail([]() {
 		// test called
 		REQUIRE(true);
+	}).done([]() {
+		Q_ASSERT_X(false,
+			"Should call fail callback after reject called",
+			"Resolve callback must be unreachable");
 	});
 	// reject
 	defer.reject();
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should change state from pending to resolved after resolve called", "[done][resolve][state]")
@@ -66,7 +89,7 @@ TEST_CASE("Should change state from pending to resolved after resolve called", "
 	// resolve
 	defer.resolve();
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should change state from pending to rejected after reject called", "[fail][reject][state]")
@@ -83,7 +106,7 @@ TEST_CASE("Should change state from pending to rejected after reject called", "[
 	// reject
 	defer.reject();
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callback with simple argument after resolve called", "[done][resolve][args]")
@@ -99,7 +122,7 @@ TEST_CASE("Should call done callback with simple argument after resolve called",
 	// resolve
 	defer.resolve(i);
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call fail callback with simple argument after reject called", "[fail][reject][args]")
@@ -115,7 +138,7 @@ TEST_CASE("Should call fail callback with simple argument after reject called", 
 	// reject
 	defer.reject(i);
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callback with complex argument after resolve called", "[done][resolve][args]")
@@ -134,7 +157,7 @@ TEST_CASE("Should call done callback with complex argument after resolve called"
 	// resolve
 	defer.resolve(listArgs);
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call fail callback with complex argument after reject called", "[fail][reject][args]")
@@ -153,7 +176,7 @@ TEST_CASE("Should call fail callback with complex argument after reject called",
 	// reject
 	defer.reject(listArgs);
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callbacks in the order they were registered", "[done][resolve][multi]")
@@ -178,7 +201,7 @@ TEST_CASE("Should call done callbacks in the order they were registered", "[done
 	// resolve
 	defer.resolve();
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call fail callbacks in the order they were registered", "[fail][reject][multi]")
@@ -203,7 +226,7 @@ TEST_CASE("Should call fail callbacks in the order they were registered", "[fail
 	// reject
 	defer.reject();
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callback when argument of deferred is another deferred", "[done][resolve][args]")
@@ -224,7 +247,7 @@ TEST_CASE("Should call done callback when argument of deferred is another deferr
 	// resolve
 	deferOfDefer.resolve(defer);
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callback with argument when argument of deferred is another deferred", "[done][resolve][args]")
@@ -246,7 +269,7 @@ TEST_CASE("Should call done callback with argument when argument of deferred is 
 	// resolve
 	deferOfDefer.resolve(defer);
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call then resolved callback after resolve called", "[then][resolve]")
@@ -261,7 +284,7 @@ TEST_CASE("Should call then resolved callback after resolve called", "[then][res
 	// resolve
 	defer.resolve();
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call then rejected callback after rejected called", "[then][reject]")
@@ -280,10 +303,71 @@ TEST_CASE("Should call then rejected callback after rejected called", "[then][re
 	// reject
 	defer.reject();
 
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
 }
 
-TEST_CASE("Should call done callback of when deferred when all other deferreds resolve", "[when][done][resolve]")
+TEST_CASE("Should call progress callback after notify called", "[progress][notify]")
+{
+	// init
+	QDeferred<int> defer;
+	int i = 123;
+	// subscribe progress callback
+	defer.progress([&i](int val) {
+		// test called
+		REQUIRE(i == val);
+	});
+	// notify
+	defer.notify(i);
+
+	QT_PROCESS_ALL_EVENTS
+}
+
+TEST_CASE("Should call progress callback as many times as notify called", "[progress][notify]")
+{
+	// init
+	QDeferred<int> defer;
+	// subscribe progress callback
+	defer.progress([](int val) {
+		static int counter = 0;
+		// test called
+		counter++;
+		REQUIRE(counter == val);
+	});
+	// notify multiple times
+	for (int i = 1; i <= 3; i++)
+	{
+		defer.notify(i);
+	}
+
+	QT_PROCESS_ALL_EVENTS
+}
+
+TEST_CASE("Should call multiple progress callback as many times as notify called", "[progress][notify]")
+{
+	// init
+	QDeferred<int> defer;
+	// subscribe progress callback
+	defer.progress([](int val) {
+		static int counter = 0;
+		// test called
+		counter++;
+		REQUIRE(counter == val);
+	}).progress([](int val) {
+		static int counter = 0;
+		// test called
+		counter++;
+		REQUIRE(counter == val);
+	});
+	// notify multiple times
+	for (int i = 1; i <= 3; i++)
+	{
+		defer.notify(i);
+	}
+
+	QT_PROCESS_ALL_EVENTS
+}
+
+TEST_CASE("Should call done callback of when deferred when all deferreds resolve", "[when][done][resolve]")
 {
 	// init
 	QDefer defer1;
@@ -310,8 +394,40 @@ TEST_CASE("Should call done callback of when deferred when all other deferreds r
 	defer2.resolve();
 	defer3.resolve();
 
-	// NOTE : need to call twice ??
-	// TODO : find a way to empty event queue!
-	QCoreApplication::processEvents();
-	QCoreApplication::processEvents();
+	QT_PROCESS_ALL_EVENTS
+}
+
+TEST_CASE("Should call done callback of when deferred when all deferreds of different types resolve", "[when][done][resolve]")
+{
+	// init
+	QDeferred<int>            defer1;
+	QDeferred<double>         defer2;
+	QDeferred<QList<QString>> defer3;
+	int            i    = 0;
+	double         d    = 3.1416;
+	QList<QString> list = QList<QString>() << "one" << "two" << "three";
+	// subscribe other deferreds to increment and prove order
+	defer1.done([&i](int iVal) {
+		Q_UNUSED(iVal);
+		i++;
+	});
+	defer2.done([&i](double dblVal) {
+		Q_UNUSED(dblVal);
+		i++;
+	});
+	defer3.done([&i](QList<QString> strList) {
+		Q_UNUSED(strList);
+		i++;
+	});
+	// subscribe done callback of when
+	QDefer::when(defer1, defer2, defer3).done([&i]() {
+		// test called
+		REQUIRE(i == 3);
+	});
+	// resolve
+	defer1.resolve(i);
+	defer2.resolve(d);
+	defer3.resolve(list);
+
+	QT_PROCESS_ALL_EVENTS
 }

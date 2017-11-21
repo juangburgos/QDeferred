@@ -423,8 +423,18 @@ void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 		return;
 	}
 
-	// [GCC_DEF_FIX] before there was no need of this, but since GCC incompatibility now there is need
-	m_finishedFunction = std::bind(GCC_DEF_FIX::finishedFunctionTemplate<Types...>, std::placeholders::_1, args...);
+	// with notify we cannot use execute -> m_finishedFunction combo because; if notify-events are
+	// not processed inmediatly after, then progress callbacks will be called with incorrect arguments
+	// (with the last agruments that were given to the last notify call, e.g. "3, 3, 3", instead of "1, 2, 3")
+	auto funcCacheArgs = std::bind(GCC_DEF_FIX::finishedFunctionTemplate<Types...>, std::placeholders::_1, args...);
+	auto funcCacheFun  = [funcCacheArgs](QList< std::function<void(Types(&...args))> > &listCallbacks) mutable {
+		// loop all callbacks
+		for (int i = 0; i < listCallbacks.length(); i++)
+		{
+			// call each callback with cached arguments
+			funcCacheArgs(listCallbacks.at(i));
+		}
+	};
 
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
@@ -437,10 +447,10 @@ void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 		auto p_currCallbacks = m_callbacksMap[p_currThread];
 		// create object in heap and assign function (event loop takes ownership and deletes it later)
 		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [ref, this, p_currCallbacks]() mutable {
-			// execute all done callbacks
-			this->execute(p_currCallbacks->m_progressList); // PROGRESS
-			Q_UNUSED(ref)
+		p_Evt->m_eventFunc = [ref, this, p_currCallbacks, funcCacheFun]() mutable {
+			Q_UNUSED(ref);
+			// loop execute all progress callbacks
+			funcCacheFun(p_currCallbacks->m_progressList); // PROGRESS
 		};
 		// post event for object with correct thread affinity
 		QCoreApplication::postEvent(p_currObject, p_Evt);
