@@ -30,8 +30,6 @@ public:
 	// fail method
 	QDeferred<Types...> fail(std::function<void(Types(&...args))> callback);
 
-	
-
 	// then method
 	template<class ...RetTypes, typename T>
 	inline QDeferred<RetTypes...> then(T doneCallback) {
@@ -40,7 +38,15 @@ public:
 	template<class ...RetTypes>
 	QDeferred<RetTypes...> thenAlias(std::function<QDeferred<RetTypes...>(Types(&...args))> doneCallback);
 
-
+	// then method
+	template<class ...RetTypes, typename T>
+	inline QDeferred<RetTypes...> then(T doneCallback, std::function<void(Types(&...args))> failCallback) {
+		return this->thenAlias<RetTypes...>(doneCallback, failCallback);
+	};
+	template<class ...RetTypes>
+	QDeferred<RetTypes...> thenAlias(
+		std::function<QDeferred<RetTypes...>(Types(&...args))> doneCallback,
+		std::function<void(Types(&...args))>                   failCallback);
 
 	// progress method
 	QDeferred<Types...> progress(std::function<void(Types(&...args))> callback);
@@ -191,12 +197,15 @@ QDeferred<RetTypes...> QDeferred<Types...>::thenAlias(
 	// create deferred to return
 	QDeferred<RetTypes...> retPromise;
 
-	// add intermediate callback
-	m_data->done([doneCallback, retPromise](Types(&...args1)) mutable {
+	// add intermediate done nameless callback
+	this->done([doneCallback, retPromise](Types(&...args1)) mutable {
 		// when done execute user callback, then when user deferred and when done...
 		doneCallback(args1...).done([retPromise](RetTypes(&...args2)) mutable {
 			// resolve returned deferred
 			retPromise.resolve(args2...);
+		}).fail([retPromise](RetTypes(&...args2)) mutable {
+			// resolve returned deferred
+			retPromise.reject(args2...);
 		});
 	});
 
@@ -204,7 +213,37 @@ QDeferred<RetTypes...> QDeferred<Types...>::thenAlias(
 	return retPromise;
 }
 
+template<class ...Types>
+template<class ...RetTypes>
+QDeferred<RetTypes...> QDeferred<Types...>::thenAlias(
+	std::function<QDeferred<RetTypes...>(Types(&...args))> doneCallback,
+	std::function<void(Types(&...args))>                   failCallback)
+{
+	// check if valid
+	Q_ASSERT_X(doneCallback, "Deferred then method.", "Invalid done callback as first argument");
+	Q_ASSERT_X(failCallback, "Deferred then method.", "Invalid fail callback as second argument");
 
+	// create deferred to return
+	QDeferred<RetTypes...> retPromise;
+
+	// add intermediate nameless callback
+	this->done([doneCallback, retPromise](Types(&...args1)) mutable {
+		// when done execute user callback, then when user deferred and when done...
+		doneCallback(args1...).done([retPromise](RetTypes(&...args2)) mutable {
+			// resolve returned deferred
+			retPromise.resolve(args2...);
+		}).fail([retPromise](RetTypes(&...args2)) mutable {
+			// resolve returned deferred
+			retPromise.reject(args2...);
+		});
+	}).fail([failCallback, retPromise](Types(&...args1)) mutable {
+		// when fail execute user callback
+		failCallback(args1...);
+	});
+
+	// return new deferred
+	return retPromise;
+}
 
 template<class ...Types>
 QDeferred<Types...> QDeferred<Types...>::progress(std::function<void(Types(&...args))> callback)

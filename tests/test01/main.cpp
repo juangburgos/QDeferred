@@ -43,7 +43,7 @@ TEST_CASE("Should call done callback after resolve called", "[done][resolve]")
 	QDefer defer;
 	// subscribe done callback
 	defer.done([]() {
-		// test called
+		// test that gets called
 		REQUIRE(true);
 	}).fail([]() {
 		Q_ASSERT_X(false,
@@ -62,7 +62,7 @@ TEST_CASE("Should call fail callback after reject called", "[fail][reject]")
 	QDefer defer;
 	// subscribe fail callback
 	defer.fail([]() {
-		// test called
+		// test that gets called
 		REQUIRE(true);
 	}).done([]() {
 		Q_ASSERT_X(false,
@@ -116,7 +116,7 @@ TEST_CASE("Should call done callback with simple argument after resolve called",
 	int i = 123;
 	// subscribe done callback
 	defer.done([i](int val) {
-		// test called with argument
+		// test that gets called with argument
 		REQUIRE(i == val);
 	});
 	// resolve
@@ -132,7 +132,7 @@ TEST_CASE("Should call fail callback with simple argument after reject called", 
 	int i = 123;
 	// subscribe fail callback
 	defer.fail([i](int val) {
-		// test called with argument
+		// test that gets called with argument
 		REQUIRE(i == val);
 	});
 	// reject
@@ -151,7 +151,7 @@ TEST_CASE("Should call done callback with complex argument after resolve called"
 	listArgs.append(12345);
 	// subscribe done callback
 	defer.done([listArgs](QList<QVariant> val) {
-		// test called with argument
+		// test that gets called with argument
 		REQUIRE(listArgs == val);
 	});
 	// resolve
@@ -170,7 +170,7 @@ TEST_CASE("Should call fail callback with complex argument after reject called",
 	listArgs.append(12345);
 	// subscribe fail callback
 	defer.fail([listArgs](QList<QVariant> val) {
-		// test called with argument
+		// test that gets called with argument
 		REQUIRE(listArgs == val);
 	});
 	// reject
@@ -186,15 +186,15 @@ TEST_CASE("Should call done callbacks in the order they were registered", "[done
 	int i = 0;
 	// subscribe done callbacks
 	defer.done([&i]() {
-		// test called in order
+		// test that gets called in order
 		i++;
 		REQUIRE(i == 1);
 	}).done([&i]() {
-		// test called in order
+		// test that gets called in order
 		i++;
 		REQUIRE(i == 2);
 	}).done([&i]() {
-		// test called in order
+		// test that gets called in order
 		i++;
 		REQUIRE(i == 3);
 	});
@@ -211,15 +211,15 @@ TEST_CASE("Should call fail callbacks in the order they were registered", "[fail
 	int i = 0;
 	// subscribe fail callbacks
 	defer.fail([&i]() {
-		// test called in order
+		// test that gets called in order
 		i++;
 		REQUIRE(i == 1);
 	}).fail([&i]() {
-		// test called in order
+		// test that gets called in order
 		i++;
 		REQUIRE(i == 2);
 	}).fail([&i]() {
-		// test called in order
+		// test that gets called in order
 		i++;
 		REQUIRE(i == 3);
 	});
@@ -236,7 +236,7 @@ TEST_CASE("Should call done callback when argument of deferred is another deferr
 	QDefer defer;
 	// subscribe done callback
 	defer.done([]() {
-		// test called
+		// test that gets called
 		REQUIRE(true);
 	});
 	// subscribe done callback
@@ -257,7 +257,7 @@ TEST_CASE("Should call done callback with argument when argument of deferred is 
 	QDeferred<int> defer;
 	// subscribe done callback
 	defer.done([](int val) {
-		// test called
+		// test that gets called
 		REQUIRE(val == 123);
 	});
 	// subscribe done callback
@@ -279,7 +279,7 @@ TEST_CASE("Should call progress callback after notify called", "[progress][notif
 	int i = 123;
 	// subscribe progress callback
 	defer.progress([&i](int val) {
-		// test called
+		// test that gets called
 		REQUIRE(i == val);
 	});
 	// notify
@@ -295,7 +295,7 @@ TEST_CASE("Should call progress callback as many times as notify called", "[prog
 	// subscribe progress callback
 	defer.progress([](int val) {
 		static int counter = 0;
-		// test called
+		// test that gets called
 		counter++;
 		REQUIRE(counter == val);
 	});
@@ -315,12 +315,12 @@ TEST_CASE("Should call multiple progress callback as many times as notify called
 	// subscribe progress callback
 	defer.progress([](int val) {
 		static int counter = 0;
-		// test called
+		// test that gets called
 		counter++;
 		REQUIRE(counter == val);
 	}).progress([](int val) {
 		static int counter = 0;
-		// test called
+		// test that gets called
 		counter++;
 		REQUIRE(counter == val);
 	});
@@ -352,7 +352,7 @@ TEST_CASE("Should call done callback of when deferred when all deferreds resolve
 	});
 	// subscribe done callback of when
 	QDefer::when(defer1, defer2, defer3).done([&i]() {
-		// test called
+		// test that gets called
 		REQUIRE(i == 3);
 	});
 	// resolve
@@ -387,7 +387,7 @@ TEST_CASE("Should call done callback of when deferred when all deferreds of diff
 	});
 	// subscribe done callback of when
 	QDefer::when(defer1, defer2, defer3).done([&i]() {
-		// test called
+		// test that gets called
 		REQUIRE(i == 3);
 	});
 	// resolve
@@ -405,7 +405,7 @@ TEST_CASE("Should call then resolved callback after resolve called", "[then][res
 	// subscribe then callback
 	defer1.then<int>([]() {
 		QDeferred<int> defer2;
-		// test called
+		// test that gets called
 		REQUIRE(true);
 		// return deferred
 		return defer2;
@@ -423,7 +423,7 @@ TEST_CASE("Should call chained then resolved callback after resolve called", "[t
 	// subscribe then callback
 	defer1.then<int>([]() {
 		QDeferred<int> defer2;
-		// test called
+		// test that gets called
 		REQUIRE(true);
 		// resolve and return
 		int i = 123;
@@ -431,7 +431,7 @@ TEST_CASE("Should call chained then resolved callback after resolve called", "[t
 		return defer2;
 	}).then<double, QString>([](int val) {
 		QDeferred<double, QString> defer3;
-		// test called
+		// test that gets called
 		REQUIRE(val == 123);
 		// resolve and return
 		double  d   = 3.141592;
@@ -439,7 +439,7 @@ TEST_CASE("Should call chained then resolved callback after resolve called", "[t
 		defer3.resolve(d, str);
 		return defer3;
 	}).done([](double val, QString str) { // NOTE : call 'done' at the end of the chain
-		// test called
+		// test that gets called
 		REQUIRE(val == 3.141592);
 		REQUIRE(str == QString("hello"));
 	});
@@ -449,22 +449,69 @@ TEST_CASE("Should call chained then resolved callback after resolve called", "[t
 	QT_PROCESS_ALL_EVENTS
 }
 
-//TEST_CASE("Should call then rejected callback after rejected called", "[then][reject]")
-//{
-//	// init
-//	QDefer defer;
-//	// subscribe then callback
-//	defer.then<void>([]() {
-//		Q_ASSERT_X(false, 
-//			"Should call then resolved callback after resolve called", 
-//			"Resolve callback must be unreachable");
-//	}, []() {
-//		// test called
-//		REQUIRE(true);
-//	});
-//	// reject
-//	defer.reject();
-//
-//	QT_PROCESS_ALL_EVENTS
-//}
+TEST_CASE("Should call then rejected callback after rejected called", "[then][reject]")
+{
+	// init
+	QDefer defer1;
+	// subscribe then callback
+	defer1.then<int>([]() {
+		QDeferred<int> defer2;
+		Q_ASSERT_X(false,
+			"Should call then rejected callback after rejected called",
+			"Resolve callback must be unreachable");
+		// return deferred
+		return defer2;
+	}, []() {
+		// test that gets called
+		REQUIRE(true);
+	}).fail([](int val) {
+		// should not be called because 'then' returns a *different* deferred object
+		Q_UNUSED(val);
+		Q_ASSERT_X(false,
+			"Should call then rejected callback after rejected called",
+			"Reject callback must be unreachable");
+	});
+	// reject
+	defer1.reject();
 
+	QT_PROCESS_ALL_EVENTS
+}
+
+TEST_CASE("Should call second chained then rejected callback after rejected called", "[then][reject][chain]")
+{
+	// init
+	QDefer defer1;
+	// subscribe then callback
+	defer1.then<int>([]() {
+		QDeferred<int> defer2;
+		// test that gets called
+		REQUIRE(true);
+		// reject and return
+		int i = 123;
+		defer2.reject(i);
+		return defer2;
+	}).fail([](int val) {
+		Q_UNUSED(val);
+		// test that gets called
+		REQUIRE(true);
+	}).then<int>([](int val) {
+		QDeferred<int> defer3;
+		Q_UNUSED(val);
+		Q_ASSERT_X(false,
+			"Should call second chained then rejected callback after rejected called",
+			"Chained then callback must be unreachable");
+		return defer3;
+	}, [](int val) {
+		Q_UNUSED(val);
+		// test that gets called
+		REQUIRE(true);
+	});
+	// resolve
+	defer1.resolve();
+
+	QT_PROCESS_ALL_EVENTS
+}
+
+// TODO : how should it work for fail callback as second argument?
+// TODO : test longer chain
+// TODO : debug versions?
