@@ -503,9 +503,10 @@ TEST_CASE("Should call second chained then rejected callback after second reject
 TEST_CASE("Should call last chained then rejected callback after first rejected called", "[then][reject][chain]")
 {
 	// init
-	QDefer defer1;
+	QDeferred<bool> defer1;
 	// subscribe then callback
-	defer1.then<int>([]() {
+	defer1.then<int>([](bool val) {
+		Q_UNUSED(val);
 		QDeferred<int> defer2;
 		REQUIRE(false);
 		return defer2;
@@ -524,12 +525,12 @@ TEST_CASE("Should call last chained then rejected callback after first rejected 
 		Q_UNUSED(val);
 		REQUIRE(false);
 		return defer5;
-	}, []() { // fail over 'defer2' with zero args
+	}, []() { // fail over 'defer1' with zero args
 		// test that gets called
 		REQUIRE(true);
 	});
 	// reject
-	defer1.reject();
+	defer1.reject(false);
 
 	QT_PROCESS_ALL_EVENTS
 }
@@ -588,7 +589,7 @@ TEST_CASE("Should call last chained then rejected callback after third rejected 
 		// test that gets called
 		REQUIRE(val == 123);
 		// reject third and return
-		defer3.reject(456);
+		defer3.reject(456); // reject here
 		return defer3;
 	}).then<int>([](int val) {
 		QDeferred<int> defer4;

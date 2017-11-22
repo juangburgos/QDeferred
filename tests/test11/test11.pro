@@ -10,6 +10,7 @@ TEMPLATE = app
 
 include(./../../src/qlambdathreadworker.pri)
 include(./../../src/qdeferred.pri)
-include(./../../src/add_qt_path.pri)
 
 SOURCES += main.cpp \
+
+include(./../add_qt_path.pri)

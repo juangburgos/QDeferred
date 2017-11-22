@@ -15,3 +15,5 @@ HEADERS += derived.h \
 
 SOURCES += main.cpp \
            derived.cpp
+
+include(./../add_qt_path.pri)
