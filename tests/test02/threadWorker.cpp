@@ -54,21 +54,21 @@ void ThreadController::doWorkOnFirstDeferred(QDefer deferred1, QDeferred<int, do
 		auto p_thread = QThread::currentThread();
 		qDebug() << "[INFO] 1 thread id = " << p_thread;
 		// set done
-		deferred1.doneVsDbg([p_thread]() {
+		deferred1.done([p_thread]() {
 			qDebug() << "[INFO] DEF1::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 		});
-		deferred2.doneVsDbg([p_thread](int i, double d) {
+		deferred2.done([p_thread](int i, double d) {
 			Q_UNUSED(i)
 			Q_UNUSED(d)
 			qDebug() << "[INFO] DEF2::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 		});
-		QDefer::when(deferred1, deferred2).doneVsDbg([p_thread]() {
+		QDefer::when(deferred1, deferred2).done([p_thread]() {
 			qDebug() << "[INFO] WHEN::Callback defined in 1 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 		});
 		// set resolve timer
 		QTimer::singleShot(1000, [deferred1]() mutable {
 			qDebug() << "[INFO] DEF1::Resolved in 1 thread ********" << QThread::currentThread() << "********";
-			deferred1.resolveVsDbg();
+			deferred1.resolve();
 		});
 	};
 	// post event for object with correct thread affinity
@@ -84,15 +84,15 @@ void ThreadController::doWorkOnSecondDeferred(QDefer deferred1, QDeferred<int, d
 		auto p_thread = QThread::currentThread();
 		qDebug() << "[INFO] 2 thread id = " << p_thread;
 		// set done
-		deferred2.doneVsDbg([p_thread](int i, double d) {
+		deferred2.done([p_thread](int i, double d) {
 			Q_UNUSED(i)
 			Q_UNUSED(d)
 			qDebug() << "[INFO] DEF2::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 		});
-		deferred1.doneVsDbg([p_thread]() {
+		deferred1.done([p_thread]() {
 			qDebug() << "[INFO] DEF1::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 		});
-		QDefer::when(deferred1, deferred2).doneVsDbg([p_thread]() {
+		QDefer::when(deferred1, deferred2).done([p_thread]() {
 			qDebug() << "[INFO] WHEN::Callback defined in 2 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 		});
 		// set resolve timer
@@ -100,7 +100,7 @@ void ThreadController::doWorkOnSecondDeferred(QDefer deferred1, QDeferred<int, d
 			int    iNum = 666;
 			double dNum = 666.666;
 			qDebug() << "[INFO] DEF2::Resolved in 2 thread ********" << QThread::currentThread() << "********";
-			deferred2.resolveVsDbg(iNum, dNum);
+			deferred2.resolve(iNum, dNum);
 		});
 	};
 	// post event for object with correct thread affinity

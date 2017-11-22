@@ -46,9 +46,7 @@ TEST_CASE("Should call done callback after resolve called", "[done][resolve]")
 		// test that gets called
 		REQUIRE(true);
 	}).fail([]() {
-		Q_ASSERT_X(false,
-			"Should call done callback after resolve called",
-			"Reject callback must be unreachable");
+		REQUIRE(false);
 	});
 	// resolve
 	defer.resolve();
@@ -65,9 +63,7 @@ TEST_CASE("Should call fail callback after reject called", "[fail][reject]")
 		// test that gets called
 		REQUIRE(true);
 	}).done([]() {
-		Q_ASSERT_X(false,
-			"Should call fail callback after reject called",
-			"Resolve callback must be unreachable");
+		REQUIRE(false);
 	});
 	// reject
 	defer.reject();
@@ -456,28 +452,24 @@ TEST_CASE("Should call then rejected callback after rejected called", "[then][re
 	// subscribe then callback
 	defer1.then<int>([]() {
 		QDeferred<int> defer2;
-		Q_ASSERT_X(false,
-			"Should call then rejected callback after rejected called",
-			"Resolve callback must be unreachable");
+		REQUIRE(false);
 		// return deferred
 		return defer2;
-	}, []() {
+	}, []() { // fail over 'defer1' with zero arguments
 		// test that gets called
 		REQUIRE(true);
 	}).fail([](int val) {
-		// should not be called because 'then' returns a *different* deferred object
+		// fail over 'defer2', which is not resolved nor rejected, therefore not called
 		Q_UNUSED(val);
-		Q_ASSERT_X(false,
-			"Should call then rejected callback after rejected called",
-			"Reject callback must be unreachable");
+		REQUIRE(false);
 	});
-	// reject
-	defer1.reject();
+	// reject first
+	defer1.reject(); // reject here
 
 	QT_PROCESS_ALL_EVENTS
 }
 
-TEST_CASE("Should call second chained then rejected callback after rejected called", "[then][reject][chain]")
+TEST_CASE("Should call second chained then rejected callback after second rejected called", "[then][reject][chain]")
 {
 	// init
 	QDefer defer1;
@@ -486,23 +478,19 @@ TEST_CASE("Should call second chained then rejected callback after rejected call
 		QDeferred<int> defer2;
 		// test that gets called
 		REQUIRE(true);
-		// reject and return
-		int i = 123;
-		defer2.reject(i);
+		// reject second and return
+		defer2.reject(123); // reject here
 		return defer2;
-	}).fail([](int val) {
+	}).fail([](int val) { // fail over 'defer2' with arguments
 		Q_UNUSED(val);
 		// test that gets called
 		REQUIRE(true);
 	}).then<int>([](int val) {
 		QDeferred<int> defer3;
 		Q_UNUSED(val);
-		Q_ASSERT_X(false,
-			"Should call second chained then rejected callback after rejected called",
-			"Chained then callback must be unreachable");
+		REQUIRE(false);
 		return defer3;
-	}, [](int val) {
-		Q_UNUSED(val);
+	}, []() { // fail over 'defer2' with zero arguments
 		// test that gets called
 		REQUIRE(true);
 	});
@@ -512,6 +500,112 @@ TEST_CASE("Should call second chained then rejected callback after rejected call
 	QT_PROCESS_ALL_EVENTS
 }
 
-// TODO : how should it work for fail callback as second argument?
-// TODO : test longer chain
-// TODO : debug versions?
+TEST_CASE("Should call last chained then rejected callback after first rejected called", "[then][reject][chain]")
+{
+	// init
+	QDefer defer1;
+	// subscribe then callback
+	defer1.then<int>([]() {
+		QDeferred<int> defer2;
+		REQUIRE(false);
+		return defer2;
+	}).then<int>([](int val) {
+		QDeferred<int> defer3;
+		Q_UNUSED(val);
+		REQUIRE(false);
+		return defer3;
+	}).then<int>([](int val) {
+		QDeferred<int> defer4;
+		Q_UNUSED(val);
+		REQUIRE(false);
+		return defer4;
+	}).then<int>([](int val) {
+		QDeferred<int> defer5;
+		Q_UNUSED(val);
+		REQUIRE(false);
+		return defer5;
+	}, []() { // fail over 'defer2' with zero args
+		// test that gets called
+		REQUIRE(true);
+	});
+	// reject
+	defer1.reject();
+
+	QT_PROCESS_ALL_EVENTS
+}
+
+TEST_CASE("Should call last chained then rejected callback after second rejected called", "[then][reject][chain]")
+{
+	// init
+	QDefer defer1;
+	// subscribe then callback
+	defer1.then<int>([]() {
+		QDeferred<int> defer2;
+		// test that gets called
+		REQUIRE(true);
+		// reject second and return
+		defer2.reject(123); // reject here
+		return defer2;
+	}).then<int>([](int val) {
+		QDeferred<int> defer3;
+		Q_UNUSED(val);
+		REQUIRE(false);
+		return defer3;
+	}).then<int>([](int val) {
+		QDeferred<int> defer4;
+		Q_UNUSED(val);
+		REQUIRE(false);
+		return defer4;
+	}).then<int>([](int val) {
+		QDeferred<int> defer5;
+		Q_UNUSED(val);
+		REQUIRE(false);
+		return defer5;
+	}, []() { // fail over 'defer2' with zero args
+		// test that gets called
+		REQUIRE(true);
+	});
+	// resolve
+	defer1.resolve();
+
+	QT_PROCESS_ALL_EVENTS
+}
+
+TEST_CASE("Should call last chained then rejected callback after third rejected called", "[then][reject][chain]")
+{
+	// init
+	QDefer defer1;
+	// subscribe then callback
+	defer1.then<int>([]() {
+		QDeferred<int> defer2;
+		// test that gets called
+		REQUIRE(true);
+		// resolve second and return
+		defer2.resolve(123);
+		return defer2;
+	}).then<int>([](int val) {
+		QDeferred<int> defer3;		
+		// test that gets called
+		REQUIRE(val == 123);
+		// reject third and return
+		defer3.reject(456);
+		return defer3;
+	}).then<int>([](int val) {
+		QDeferred<int> defer4;
+		Q_UNUSED(val);
+		REQUIRE(false);
+		return defer4;
+	}).then<int>([](int val) {
+		QDeferred<int> defer5;
+		Q_UNUSED(val);
+		REQUIRE(false);
+		return defer5;
+	}, []() { // fail over 'defer3' with zero args
+		// test that gets called
+		REQUIRE(true);
+	});
+	// resolve
+	defer1.resolve();
+
+	QT_PROCESS_ALL_EVENTS
+}

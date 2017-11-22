@@ -31,11 +31,11 @@ int main(int argc, char *argv[])
 	{
 		// setup deferred
 		QDeferred<int> retDeferred;
-		retDeferred.doneVsDbg(callback);
+		retDeferred.done(callback);
 		// resolve in different thread
 		worker.execInThread([retDeferred, i]() mutable {
 			qDebug() << "[INFO] Resolve with  " << i << " in thread = " << QThread::currentThread();
-			retDeferred.resolveVsDbg(i);
+			retDeferred.resolve(i);
 		});
 		// do not block event loop
 		QCoreApplication::processEvents();

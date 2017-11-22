@@ -28,15 +28,15 @@ int main(int argc, char *argv[])
 	auto p_thread = QThread::currentThread();
 	qDebug() << "[INFO] 0 thread id = " << p_thread;
 
-	deferred1.doneVsDbg([p_thread]() {
+	deferred1.done([p_thread]() {
 		qDebug() << "[INFO] DEF1::Callback defined in 0 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 	});
-	deferred2.doneVsDbg([p_thread](int i, double d) {
+	deferred2.done([p_thread](int i, double d) {
 		Q_UNUSED(i)
 		Q_UNUSED(d)
 		qDebug() << "[INFO] DEF2::Callback defined in 0 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 	});
-	QDefer::when(deferred1, deferred2).doneVsDbg([p_thread]() {
+	QDefer::when(deferred1, deferred2).done([p_thread]() {
 		qDebug() << "[INFO] WHEN::Callback defined in 0 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 	});
 	
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 		delete p_controller1;
 	});
 
-	controller2.doProgressWork(1500).doneVsDbg([p_thread](int num) {
+	controller2.doProgressWork(1500).done([p_thread](int num) {
 		qDebug() << "[INFO] DEF3::Callback defined in 0 thread " << p_thread << ", exec in thread " << QThread::currentThread();
 		qDebug() << "[INFO] DEF3::Callback result was " << num;
 	});

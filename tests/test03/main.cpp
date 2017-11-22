@@ -26,11 +26,11 @@ int main(int argc, char *argv[])
 
 	ThreadController controller;
 	// setup
-	controller.doProgressWork(100, 30).progressVsDbg([](int num) {
+	controller.doProgressWork(100, 30).progress([](int num) {
 		qDebug() << "[INFO] Progress callback with " << num << " in thread = " << QThread::currentThread();
-	}).doneVsDbg([](int num) {
+	}).done([](int num) {
 		qDebug() << "[INFO] Done callback with  " << num << " in thread = " << QThread::currentThread();
-	}).failVsDbg([](int num) {
+	}).fail([](int num) {
 		qDebug() << "[INFO] Fail callback with  " << num << " in thread = " << QThread::currentThread();
 	});
 	
