@@ -22,14 +22,14 @@ public:
 
 	// on method
 	// NOTE : inline below are useless, only to avoid intellisense ugly read
-	template<typename ...Types, typename T>
-	QDynamicEventsHandle on(QString strEventName, T callback) {
-		return onAlias<Types...>(strEventName, callback);
+	template<typename ...Types, typename T1, typename T2>
+	QDynamicEventsHandle on(QString strEventName, T1 callback, T2 filter = nullptr) {
+		return onAlias<Types...>(strEventName, callback, filter);
 	};
 	// once method	
-	template<typename ...Types, typename T>
-	QDynamicEventsHandle once(QString strEventName, T callback) {
-		return onceAlias<Types...>(strEventName, callback);
+	template<typename ...Types, typename T1, typename T2>
+	QDynamicEventsHandle once(QString strEventName, T1 callback, T2 filter = nullptr) {
+		return onceAlias<Types...>(strEventName, callback, filter);
 	};
 	// off method (all callbacks registered to an specific event name)
 	void off(QString strEventName);
@@ -47,9 +47,9 @@ public:
 protected:
 	// without alias would work, but annoying intellisense appears 
 	template<typename ...Types>
-	QDynamicEventsHandle onAlias(QString strEventName, std::function<void(Types(&...args))> callback);
+	QDynamicEventsHandle onAlias(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr);
 	template<typename ...Types>
-	QDynamicEventsHandle onceAlias(QString strEventName, std::function<void(Types(&...args))> callback);
+	QDynamicEventsHandle onceAlias(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr);
 
 	/*
 	use combination of QMap and template function to emulate variable templates
@@ -76,15 +76,15 @@ QDynamicEvents<Types...> QEventer::getEventer()
 }
 
 template<typename ...Types>
-QDynamicEventsHandle QEventer::onAlias(QString strEventName, std::function<void(Types(&...args))> callback)
+QDynamicEventsHandle QEventer::onAlias(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/)
 {
-	return getEventer<Types...>().on(strEventName, callback);
+	return getEventer<Types...>().on(strEventName, callback, filter);
 }
 
 template<typename ...Types>
-QDynamicEventsHandle QEventer::onceAlias(QString strEventName, std::function<void(Types(&...args))> callback)
+QDynamicEventsHandle QEventer::onceAlias(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/)
 {
-	return getEventer<Types...>().once(strEventName, callback);
+	return getEventer<Types...>().once(strEventName, callback, filter);
 }
 
 

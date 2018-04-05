@@ -75,9 +75,9 @@ public:
 	// consumer API
 
 	// on method	
-	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback);
+	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr);
 	// once method	
-	QDynamicEventsHandle once(QString strEventName, std::function<void(Types(&...args))> callback);
+	QDynamicEventsHandle once(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr);
 	// off method (all callbacks registered to an specific event name)
 	void off(QString strEventName);
 	// off method (specific callback based on handle)
@@ -98,7 +98,7 @@ private:
 	QMap< QString,        // by event name
 		QMap< QThread *,  // by thread
 			QMap< qlonglong, // an identifier for the function
-					std::function<void(Types(&...args))>
+					QPair<std::function<void(Types(&...args))>, std::function<bool(Types(&...args))>>
 				> 
 			> 
 		> m_callbacksMap;
@@ -106,16 +106,16 @@ private:
 	QMap< QString,        // by event name
 		QMap< QThread *,  // by thread
 			QMap< qlonglong, // an identifier for the function
-					std::function<void(Types(&...args))>
+					QPair<std::function<void(Types(&...args))>, std::function<bool(Types(&...args))>>
 				>
 			>
 		> m_callbacksMapOnce;
 	// create proxy object for unknown thread
 	void createProxyObj(QString &strEventName);
 	// internal on
-	void onInternal(QString &strEventName, std::function<void(Types(&...args))> callback, qlonglong &funcId);
+	void onInternal(QString &strEventName, qlonglong &funcId, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr);
 	// internal once
-	void onceInternal(QString &strEventName, std::function<void(Types(&...args))> callback, qlonglong &funcId);
+	void onceInternal(QString &strEventName, qlonglong &funcId, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr);
 	// off method (all callbacks registered to an specific event name)
 	void offInternal(QString &strEventName);
 	// off method (specific callback based on handle)
@@ -228,7 +228,7 @@ void QDynamicEventsData<Types...>::createProxyObj(QString &strEventName)
 }
 
 template<class ...Types>
-QDynamicEventsHandle QDynamicEventsData<Types...>::on(QString strEventName, std::function<void(Types(&...args))> callback)
+QDynamicEventsHandle QDynamicEventsData<Types...>::on(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/)
 {
 	// split by spaces
 	QStringList listEventNames = strEventName.split(QRegExp("\\s+"), QString::SkipEmptyParts);
@@ -241,21 +241,22 @@ QDynamicEventsHandle QDynamicEventsData<Types...>::on(QString strEventName, std:
 	// for each event name
 	for (int i = 0; i < listEventNames.count(); i++)
 	{
-		onInternal(listEventNames[i], callback, funcId);
+		onInternal(listEventNames[i], funcId, callback, filter);
 	}
 	// return hash
 	return QDynamicEventsHandle(strEventName, QThread::currentThread(), funcId);
 }
 
 template<class ...Types>
-void QDynamicEventsData<Types...>::onInternal(QString &strEventName, std::function<void(Types(&...args))> callback, qlonglong &funcId)
+void QDynamicEventsData<Types...>::onInternal(QString &strEventName, qlonglong &funcId, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/)
 {
 	// [NOTE] No lock in internal methods
-	m_callbacksMap[strEventName][QThread::currentThread()][funcId] = callback;
+	m_callbacksMap[strEventName][QThread::currentThread()][funcId].first  = callback;
+	m_callbacksMap[strEventName][QThread::currentThread()][funcId].second = filter  ;
 }
 
 template<class ...Types>
-QDynamicEventsHandle QDynamicEventsData<Types...>::once(QString strEventName, std::function<void(Types(&...args))> callback)
+QDynamicEventsHandle QDynamicEventsData<Types...>::once(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/)
 {
 	// split by spaces
 	QStringList listEventNames = strEventName.split(QRegExp("\\s+"), QString::SkipEmptyParts);
@@ -268,17 +269,18 @@ QDynamicEventsHandle QDynamicEventsData<Types...>::once(QString strEventName, st
 	// for each event name
 	for (int i = 0; i < listEventNames.count(); i++)
 	{
-		onceInternal(listEventNames[i], callback, funcId);
+		onceInternal(listEventNames[i], funcId, callback, filter);
 	}
 	// return hash
 	return QDynamicEventsHandle(strEventName, QThread::currentThread(), funcId);
 }
 
 template<class ...Types>
-void QDynamicEventsData<Types...>::onceInternal(QString &strEventName, std::function<void(Types(&...args))> callback, qlonglong &funcId)
+void QDynamicEventsData<Types...>::onceInternal(QString &strEventName, qlonglong &funcId, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/)
 {
 	// [NOTE] No lock in internal methods
-	m_callbacksMapOnce[strEventName][QThread::currentThread()][funcId] = callback;
+	m_callbacksMapOnce[strEventName][QThread::currentThread()][funcId].first  = callback;
+	m_callbacksMapOnce[strEventName][QThread::currentThread()][funcId].second = filter;
 }
 
 template<class ...Types>
@@ -304,9 +306,19 @@ void QDynamicEventsData<Types...>::triggerInternal(QDynamicEvents<Types...> ref,
 	auto listThreads = m_callbacksMap[strEventName].keys();
 	for (int i = 0; i < listThreads.count(); i++)
 	{
-		auto p_currThread = listThreads.at(i);
+		auto p_currThread     = listThreads.at(i);
 		auto mapOnlyCallbacks = this->m_callbacksMap[strEventName][p_currThread];
-		if (m_callbacksMap.count() <= 0)
+		// filter callbacks
+		auto listHandles = mapOnlyCallbacks.keys();
+		for (int j = 0; j < listHandles.count(); j++)
+		{
+			auto currHandle = listHandles.at(j);
+			if (mapOnlyCallbacks[currHandle].second && !mapOnlyCallbacks[currHandle].second(args...))
+			{
+				mapOnlyCallbacks.take(currHandle);
+			}
+		}
+		if (mapOnlyCallbacks.count() <= 0)
 		{
 			continue;
 		}
@@ -319,7 +331,7 @@ void QDynamicEventsData<Types...>::triggerInternal(QDynamicEvents<Types...> ref,
 			for (int j = 0; j < listHandles.count(); j++)
 			{
 				auto currHandle = listHandles.at(j);
-				mapOnlyCallbacks[currHandle](args...);
+				mapOnlyCallbacks[currHandle].first(args...);
 			}
 			// unused, but we need it to keep at least one reference until all callbacks are executed
 			Q_UNUSED(ref)
@@ -335,6 +347,16 @@ void QDynamicEventsData<Types...>::triggerInternal(QDynamicEvents<Types...> ref,
 	{
 		auto p_currThread = listThreadsOnce.at(i);
 		auto mapOnlyCallbacksOnce = this->m_callbacksMapOnce[strEventName].take(p_currThread);
+		// filter callbacks
+		auto listHandles = mapOnlyCallbacksOnce.keys();
+		for (int j = 0; j < listHandles.count(); j++)
+		{
+			auto currHandle = listHandles.at(j);
+			if (mapOnlyCallbacksOnce[currHandle].second && !mapOnlyCallbacksOnce[currHandle].second(args...))
+			{
+				mapOnlyCallbacksOnce.take(currHandle);
+			}
+		}
 		if (mapOnlyCallbacksOnce.count() <= 0)
 		{
 			continue;
@@ -348,7 +370,7 @@ void QDynamicEventsData<Types...>::triggerInternal(QDynamicEvents<Types...> ref,
 			for (int j = 0; j < listHandles.count(); j++)
 			{
 				auto currHandle = listHandles.at(j);
-				mapOnlyCallbacksOnce[currHandle](args...);
+				mapOnlyCallbacksOnce[currHandle].first(args...);
 			}
 			// unused, but we need it to keep at least one reference until all callbacks are executed
 			Q_UNUSED(ref)

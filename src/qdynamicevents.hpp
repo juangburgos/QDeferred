@@ -35,9 +35,9 @@ public:
 	// consumer API
 
 	// on method	
-	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback);
+	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr);
 	// once method	
-	QDynamicEventsHandle once(QString strEventName, std::function<void(Types(&...args))> callback);
+	QDynamicEventsHandle once(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr);
 	// off method (all callbacks registered to an specific event name)
 	void off(QString strEventName);
 	// off method (specific callback based on handle)
@@ -88,15 +88,15 @@ QDynamicEvents<Types...>::~QDynamicEvents()
 }
 
 template<class ...Types>
-QDynamicEventsHandle QDynamicEvents<Types...>::on(QString strEventName, std::function<void(Types(&...args))> callback)
+QDynamicEventsHandle QDynamicEvents<Types...>::on(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/)
 {
-	return m_data->on(strEventName, callback);
+	return m_data->on(strEventName, callback, filter);
 }
 
 template<class ...Types>
-QDynamicEventsHandle QDynamicEvents<Types...>::once(QString strEventName, std::function<void(Types(&...args))> callback)
+QDynamicEventsHandle QDynamicEvents<Types...>::once(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/)
 {
-	return m_data->once(strEventName, callback);
+	return m_data->once(strEventName, callback, filter);
 }
 
 template<class ...Types>
