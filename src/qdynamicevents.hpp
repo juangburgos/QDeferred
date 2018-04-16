@@ -35,9 +35,9 @@ public:
 	// consumer API
 
 	// on method	
-	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr);
+	QDynamicEventsHandle on(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr, Qt::ConnectionType connection = Qt::AutoConnection);
 	// once method	
-	QDynamicEventsHandle once(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr);
+	QDynamicEventsHandle once(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter = nullptr, Qt::ConnectionType connection = Qt::AutoConnection);
 	// off method (all callbacks registered to an specific event name)
 	void off(QString strEventName);
 	// off method (specific callback based on handle)
@@ -88,15 +88,15 @@ QDynamicEvents<Types...>::~QDynamicEvents()
 }
 
 template<class ...Types>
-QDynamicEventsHandle QDynamicEvents<Types...>::on(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/)
+QDynamicEventsHandle QDynamicEvents<Types...>::on(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/, Qt::ConnectionType connection/* = Qt::AutoConnection*/)
 {
-	return m_data->on(strEventName, callback, filter);
+	return m_data->on(strEventName, callback, filter, connection);
 }
 
 template<class ...Types>
-QDynamicEventsHandle QDynamicEvents<Types...>::once(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/)
+QDynamicEventsHandle QDynamicEvents<Types...>::once(QString strEventName, std::function<void(Types(&...args))> callback, std::function<bool(Types(&...args))> filter/* = nullptr*/, Qt::ConnectionType connection/* = Qt::AutoConnection*/)
 {
-	return m_data->once(strEventName, callback, filter);
+	return m_data->once(strEventName, callback, filter, connection);
 }
 
 template<class ...Types>
