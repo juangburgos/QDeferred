@@ -160,13 +160,19 @@ QDeferred<RetTypes...> QDeferred<Types...>::thenAlias(
 	// add intermediate done nameless callback
 	m_data->done([doneCallback, retPromise](Types(...args1)) mutable {
 		// when done execute user callback, then when user deferred and when done...
-		doneCallback(args1...).done([retPromise](RetTypes(...args2)) mutable {
-			// resolve returned deferred
-			retPromise.resolve(args2...);
-		}).fail([retPromise](RetTypes(...args2)) mutable {
-			// resolve returned deferred
-			retPromise.reject(args2...);
-		});
+		doneCallback(args1...)
+			.done([retPromise](RetTypes(...args2)) mutable {
+				// resolve returned deferred
+				retPromise.resolve(args2...);
+			})
+			.fail([retPromise](RetTypes(...args2)) mutable {
+				// reject returned deferred
+				retPromise.reject(args2...);
+			})
+			.progress([retPromise](RetTypes(...args2)) mutable {
+				// notify returned deferred
+				retPromise.notify(args2...);
+			});
 	});
 
 	// allow propagation
@@ -183,7 +189,7 @@ template<class ...Types>
 template<class ...RetTypes>
 QDeferred<RetTypes...> QDeferred<Types...>::thenAlias(
 	std::function<QDeferred<RetTypes...>(Types(...args))> doneCallback,
-	std::function<void()>                                  failCallback)
+	std::function<void()>                                 failCallback)
 {
 	// check if valid
 	Q_ASSERT_X(doneCallback, "Deferred then method.", "Invalid done callback as first argument");
