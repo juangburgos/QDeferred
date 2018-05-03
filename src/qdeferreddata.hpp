@@ -160,7 +160,8 @@ private:
 };
 
 template<class ...Types>
-QDeferredData<Types...>::QDeferredData()
+QDeferredData<Types...>::QDeferredData() :
+	m_mutex(QMutex::Recursive)
 {
 	m_state = QDeferredState::PENDING;
 }
@@ -207,8 +208,6 @@ void QDeferredData<Types...>::done(std::function<void(Types(&...args))> callback
 	}
 	else
 	{
-		// unlock to avoid deadlock in getCallbaksForThread call
-		locker.unlock();
 		// add object for thread if does not exists
 		auto p_callbacks = this->getCallbaksForThread();
 		// append to done callbacks list
@@ -227,8 +226,6 @@ void QDeferredData<Types...>::fail(std::function<void(Types(&...args))> callback
 	}
 	else
 	{
-		// unlock to avoid deadlock in getCallbaksForThread call
-		locker.unlock();
 		// add object for thread if does not exists
 		auto p_callbacks = this->getCallbaksForThread();
 		// append to fail callbacks list
@@ -461,8 +458,6 @@ void QDeferredData<Types...>::doneZero(std::function<void()> callback)
 	}
 	else
 	{
-		// unlock to avoid deadlock in getCallbaksForThread call
-		locker.unlock();
 		// add object for thread if does not exists
 		auto p_callbacks = this->getCallbaksForThread();
 		// append to done zero callbacks list
@@ -481,8 +476,6 @@ void QDeferredData<Types...>::failZero(std::function<void()> callback)
 	}
 	else
 	{
-		// unlock to avoid deadlock in getCallbaksForThread call
-		locker.unlock();
 		// add object for thread if does not exists
 		auto p_callbacks = this->getCallbaksForThread();
 		// append to fail zero callbacks list
