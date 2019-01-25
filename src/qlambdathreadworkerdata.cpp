@@ -101,7 +101,7 @@ int QLambdaThreadWorkerData::startLoopInThread(const std::function<void()> &thre
 		m_mapIdtimerIds[newLoopId] = timerId;
 		// add function to map
 		mp_workerObj->m_mapFuncs[timerId] = threadLoopFunc;
-	});
+	}, Qt::HighEventPriority);
 	// return loop id (we still do not have timerId)
 	return newLoopId;
 }
@@ -122,7 +122,7 @@ bool QLambdaThreadWorkerData::stopLoopInThread(const int &intLoopId)
 		mp_workerObj->killTimer(timerId);
 		// remove function from map
 		mp_workerObj->m_mapFuncs.remove(timerId);
-	});
+	}, Qt::HighEventPriority);
 	// return success
 	return true;
 }
