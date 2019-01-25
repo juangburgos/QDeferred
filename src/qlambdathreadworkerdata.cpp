@@ -68,13 +68,13 @@ QLambdaThreadWorkerData::~QLambdaThreadWorkerData()
 	mp_workerThread->quit();
 }
 
-void QLambdaThreadWorkerData::execInThread(std::function<void()> &threadFunc)
+void QLambdaThreadWorkerData::execInThread(const std::function<void()> &threadFunc, const Qt::EventPriority &priority/* = Qt::NormalEventPriority*/)
 {
 	// create event to exec in thread
 	QLambdaThreadWorkerDataEvent * p_Evt = new QLambdaThreadWorkerDataEvent;
 	p_Evt->m_eventFunc = threadFunc;
 	// post event to thread
-	QCoreApplication::postEvent(mp_workerObj, p_Evt);
+	QCoreApplication::postEvent(mp_workerObj, p_Evt, priority);
 }
 
 QString QLambdaThreadWorkerData::getThreadId()
@@ -87,27 +87,21 @@ QThread * QLambdaThreadWorkerData::getThread()
 	return mp_workerThread;
 }
 
-int QLambdaThreadWorkerData::startLoopInThread(std::function<void()> &threadLoopFunc, int intMsSleep /*= 1000*/)
+int QLambdaThreadWorkerData::startLoopInThread(const std::function<void()> &threadLoopFunc, const quint32 &intMsSleep /*= 1000*/)
 {
-	// limit
-	if (intMsSleep < 0)
-	{
-		intMsSleep = 0;
-	}
 	// get new custom id
 	m_intIdCounter++;
 	int newLoopId = m_intIdCounter;
 	// create function to start loop
-	std::function<void()> funcStartLoop = [this, threadLoopFunc, intMsSleep, newLoopId]() {
+	// serialize map access by using event queue
+	this->execInThread([this, threadLoopFunc, intMsSleep, newLoopId]() {
 		// start the timer
 		int timerId = mp_workerObj->startTimer(intMsSleep);
 		// add timer id to map
 		m_mapIdtimerIds[newLoopId] = timerId;
 		// add function to map
 		mp_workerObj->m_mapFuncs[timerId] = threadLoopFunc;
-	};
-	// serialize map access by using event queue
-	this->execInThread(funcStartLoop);
+	});
 	// return loop id (we still do not have timerId)
 	return newLoopId;
 }
@@ -119,18 +113,16 @@ bool QLambdaThreadWorkerData::stopLoopInThread(const int &intLoopId)
 	{
 		return false;
 	}
-	// 
-	int timerId = m_mapIdtimerIds.take(intLoopId);
 	// create function to stop loop
-	auto pWorkerObjCopy = mp_workerObj;
-	std::function<void()> funcStopLoop = [pWorkerObjCopy, timerId]() {
-		// if exists, stop timer
-		pWorkerObjCopy->killTimer(timerId);
-		// remove function from map
-		pWorkerObjCopy->m_mapFuncs.remove(timerId);
-	};
 	// serialize map access by using event queue
-	this->execInThread(funcStopLoop);
+	this->execInThread([this, intLoopId]() {
+		// get real timer id of timer to stop
+		int timerId = m_mapIdtimerIds.take(intLoopId);
+		// stop timer
+		mp_workerObj->killTimer(timerId);
+		// remove function from map
+		mp_workerObj->m_mapFuncs.remove(timerId);
+	});
 	// return success
 	return true;
 }

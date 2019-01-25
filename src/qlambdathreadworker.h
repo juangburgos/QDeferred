@@ -14,13 +14,13 @@ public:
 	QLambdaThreadWorker &operator=(const QLambdaThreadWorker &rhs);
 	~QLambdaThreadWorker();
 
-	void      execInThread(std::function<void()> threadFunc);
+	void      execInThread(const std::function<void()> &threadFunc, const Qt::EventPriority &priority = Qt::NormalEventPriority);
 
 	QString   getThreadId();
 
 	QThread * getThread();
 
-	int       startLoopInThread(std::function<void()> threadLoopFunc, int uiMsSleep = 1000);
+	int       startLoopInThread(const std::function<void()> &threadLoopFunc, const quint32 &uiMsSleep = 1000);
 
 	bool      stopLoopInThread(const int &intLoopId);
 

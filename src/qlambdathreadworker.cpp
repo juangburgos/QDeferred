@@ -25,9 +25,9 @@ QLambdaThreadWorker::~QLambdaThreadWorker()
 	m_data.reset();
 }
 
-void QLambdaThreadWorker::execInThread(std::function<void()> threadFunc)
+void QLambdaThreadWorker::execInThread(const std::function<void()> &threadFunc, const Qt::EventPriority &priority/* = Qt::NormalEventPriority*/)
 {
-	m_data->execInThread(threadFunc);
+	m_data->execInThread(threadFunc, priority);
 }
 
 QString QLambdaThreadWorker::getThreadId()
@@ -40,7 +40,7 @@ QThread * QLambdaThreadWorker::getThread()
 	return m_data->getThread();
 }
 
-int QLambdaThreadWorker::startLoopInThread(std::function<void()> threadLoopFunc, int uiMsSleep /*= 1000*/)
+int QLambdaThreadWorker::startLoopInThread(const std::function<void()> &threadLoopFunc, const quint32 &uiMsSleep /*= 1000*/)
 {
 	return m_data->startLoopInThread(threadLoopFunc, uiMsSleep);
 }
