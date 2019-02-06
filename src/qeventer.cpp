@@ -17,7 +17,7 @@ QEventer::~QEventer()
 	m_mapEventers.clear();
 }
 
-void QEventer::off(QString strEventName)
+void QEventer::off(const QString &strEventName)
 {
 	QMapIterator<std::type_index, QAbstractDynamicEvents*> i(m_mapEventers);
 	while (i.hasNext()) {
@@ -26,7 +26,7 @@ void QEventer::off(QString strEventName)
 	}
 }
 
-void QEventer::off(QDynamicEventsHandle evtHandle)
+void QEventer::off(const QDynamicEventsHandle &evtHandle)
 {
 	QMapIterator<std::type_index, QAbstractDynamicEvents*> i(m_mapEventers);
 	while (i.hasNext()) {

@@ -10,6 +10,8 @@
 
 #include <QDynamicEvents>
 
+// TODO : pass on the const & idiom deeper into implementation
+
 // base class to inherit from to add all eventer's functionality
 class QEventer
 {
@@ -23,18 +25,24 @@ public:
 	// on method
 	// NOTE : inline below are useless, only to avoid intellisense ugly read
 	template<typename ...Types, typename T1, typename T2>
-	QDynamicEventsHandle on(QString strEventName, T1 callback, T2 filter = nullptr, Qt::ConnectionType connection = Qt::AutoConnection) {
+	QDynamicEventsHandle on(const QString &strEventName, 
+		                    const T1      &callback, 
+		                    const T2      &filter = nullptr, 
+		                    const Qt::ConnectionType &connection = Qt::AutoConnection) {
 		return onAlias<Types...>(strEventName, callback, filter, connection);
 	};
 	// once method	
 	template<typename ...Types, typename T1, typename T2>
-	QDynamicEventsHandle once(QString strEventName, T1 callback, T2 filter = nullptr, Qt::ConnectionType connection = Qt::AutoConnection) {
+	QDynamicEventsHandle once(const QString &strEventName, 
+		                      const T1      &callback, 
+		                      const T2      &filter = nullptr, 
+		                      const Qt::ConnectionType &connection = Qt::AutoConnection) {
 		return onceAlias<Types...>(strEventName, callback, filter, connection);
 	};
 	// off method (all callbacks registered to an specific event name)
-	void off(QString strEventName);
+	void off(const QString &strEventName);
 	// off method (specific callback based on handle)
-	void off(QDynamicEventsHandle evtHandle);
+	void off(const QDynamicEventsHandle &evtHandle);
 	// off method (all callbacks)
 	void off();
 

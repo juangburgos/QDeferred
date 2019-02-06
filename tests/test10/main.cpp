@@ -27,16 +27,16 @@ int main(int argc, char *argv[])
 		// multiple events and trigger order test
 		eventer1.on<int>("change", [](int iVal) {
 			qDebug() << "[INFO] Event \"change\" with arg = " << iVal;
-		});
+		}, nullptr); // TODO : without "nullptr" as 3rd arg => could not deduce template argument for 'T2'
 		eventer1.on<double>("sorted", [](double fVal) {
 			qDebug() << "[INFO] Event \"sorted\" with arg = " << fVal;
-		});
+		}, nullptr);
 		auto handle3 = eventer1.on<QString>("change sorted", [](QString strVal) {
 			qDebug() << "[INFO] Event \"change & sorted\" with arg = " << strVal;
-		});
+		}, nullptr);
 		eventer1.on<QString, QVariant>("custom", [](QString strVal, QVariant varVal) {
 			qDebug() << "[INFO] Event \"" << strVal << "\" with arg = " << varVal;
-		});
+		}, nullptr);
 
 		int     iVal = 666;
 		double  fVal = 3.1416;

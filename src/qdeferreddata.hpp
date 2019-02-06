@@ -109,11 +109,14 @@ public:
 	QDeferredState state();
 
 	// done method	
-	void done(std::function<void(Types (&...args))> callback); // by copy would be <Types... arg>
+	void done(const std::function<void(Types (&...args))> &callback,  // by copy would be <Types... arg>
+		      const Qt::ConnectionType &connection);
 	// fail method
-	void fail(std::function<void(Types(&...args))> callback);
+	void fail(const std::function<void(Types(&...args))> &callback, 
+		      const Qt::ConnectionType &connection);
 	// progress method
-	void progress(std::function<void(Types(&...args))> callback);
+	void progress(const std::function<void(Types(&...args))> &callback, 
+		          const Qt::ConnectionType &connection);
 
 	// provider API
 
@@ -127,9 +130,11 @@ public:
 	// internal API
 
 	// done method with zero arguments
-	void doneZero(std::function<void()> callback);
+	void doneZero(const std::function<void()> &callback, 
+		          const Qt::ConnectionType &connection);
 	// fail method with zero arguments
-	void failZero(std::function<void()> callback);
+	void failZero(const std::function<void()> &callback, 
+		          const Qt::ConnectionType &connection);
 
 	// reject method with zero arguments (only to be used internally for the 'then' propagation mechanism)
 	void rejectZero(QDeferred<Types...> ref);
@@ -138,14 +143,26 @@ public:
 	int m_whenCount = 0;
 
 private:
+	// struct to store callback data
+	struct CallbackData
+	{
+		std::function<void(Types(&...args))> callback;
+		Qt::ConnectionType                   connection;
+	};
+	// struct to store zero callback data
+	struct CallbackDataZero
+	{
+		std::function<void()> callback;
+		Qt::ConnectionType    connection;
+	};
 	// structure to contain callbacks (one instance per thread in m_callbacksMap)
 	struct DeferredAllCallbacks 
 	{
-		QList< std::function<void(Types(&...args))> > m_doneList    ;
-		QList< std::function<void(Types(&...args))> > m_failList    ;
-		QList< std::function<void(Types(&...args))> > m_progressList;
-		QList< std::function<void()               > > m_doneZeroList;
-		QList< std::function<void()               > > m_failZeroList;
+		QList< CallbackData     > m_doneList    ;
+		QList< CallbackData     > m_failList    ;
+		QList< CallbackData     > m_progressList;
+		QList< CallbackDataZero > m_doneZeroList;
+		QList< CallbackDataZero > m_failZeroList;
 	};
 	// members
 	std::function<void(std::function<void(Types(&...args))>)> m_finishedFunction;
@@ -154,8 +171,6 @@ private:
 	QMutex         m_mutex;
 	QList<QMetaObject::Connection> m_connectionList;
 	// methods
-	void execute    (QList< std::function<void(Types(&...args))> > &listCallbacks);
-	void executeZero(QList< std::function<void()               > > &listCallbacks);
 	DeferredAllCallbacks * getCallbaksForThread();
 };
 
@@ -198,7 +213,8 @@ QDeferredState QDeferredData<Types...>::state()
 }
 
 template<class ...Types>
-void QDeferredData<Types...>::done(std::function<void(Types(&...args))> callback)
+void QDeferredData<Types...>::done(const std::function<void(Types(&...args))> &callback, 
+	                               const Qt::ConnectionType &connection/* = Qt::AutoConnection*/)
 {
 	// call it inmediatly if already resolved
 	QMutexLocker locker(&m_mutex);
@@ -211,12 +227,13 @@ void QDeferredData<Types...>::done(std::function<void(Types(&...args))> callback
 		// add object for thread if does not exists
 		auto p_callbacks = this->getCallbaksForThread();
 		// append to done callbacks list
-		p_callbacks->m_doneList.append(callback);
+		p_callbacks->m_doneList.append({ callback, connection });
 	}
 }
 
 template<class ...Types>
-void QDeferredData<Types...>::fail(std::function<void(Types(&...args))> callback)
+void QDeferredData<Types...>::fail(const std::function<void(Types(&...args))> &callback, 
+	                               const Qt::ConnectionType &connection/* = Qt::AutoConnection*/)
 {
 	// call it inmediatly if already rejected
 	QMutexLocker locker(&m_mutex);
@@ -229,17 +246,18 @@ void QDeferredData<Types...>::fail(std::function<void(Types(&...args))> callback
 		// add object for thread if does not exists
 		auto p_callbacks = this->getCallbaksForThread();
 		// append to fail callbacks list
-		p_callbacks->m_failList.append(callback);
+		p_callbacks->m_failList.append({ callback, connection });
 	}
 }
 
 template<class ...Types>
-void QDeferredData<Types...>::progress(std::function<void(Types(&...args))> callback)
+void QDeferredData<Types...>::progress(const std::function<void(Types(&...args))> &callback,
+	                                   const Qt::ConnectionType &connection/* = Qt::AutoConnection*/)
 {
 	// add object for thread if does not exists
 	auto p_callbacks = this->getCallbaksForThread();
 	// append to progress callbacks list
-	p_callbacks->m_progressList.append(callback);
+	p_callbacks->m_progressList.append({ callback, connection });
 }
 
 template<class ...Types>
@@ -256,10 +274,6 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 	// change state
 	m_state = QDeferredState::RESOLVED;
 	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after resolve)
-	// [GCC_DEF_FIX] : below not working in GCC (https://stackoverflow.com/questions/18871122/compiler-bug-or-non-standard-code-variadic-template-capture-in-lambda)
-	//m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
-	//	callback(args...);
-	//};
 	m_finishedFunction = std::bind(GCC_DEF_FIX::finishedFunctionTemplate<Types...>, std::placeholders::_1, args...);
 
 	// for each thread where there are callbacks to be called
@@ -267,29 +281,79 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 	while (i.hasNext()) 
 	{
 		i.next();
-		// set test function
+		// get data for current thread
 		auto p_currThread     = i.key();
 		auto p_currObject     = QDeferredDataBase::getObjectForThread(p_currThread);
 		auto p_currCallbacks  = m_callbacksMap[p_currThread];
-		// create object in heap and assign function (event loop takes ownership and deletes it later)
-		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [ref, this, p_currCallbacks]() mutable {
-			// execute all done callbacks
-			this->execute(p_currCallbacks->m_doneList); // DONE
-			// loop all done zero callbacks
-			this->executeZero(p_currCallbacks->m_doneZeroList);  // DONE
-			// clear callbacks since wont be used again, except progress because it can be used continously
-			p_currCallbacks->m_doneList    .clear();
-			p_currCallbacks->m_failList    .clear();
-			//p_currCallbacks->m_progressList.clear(); // NOTE
-			p_currCallbacks->m_doneZeroList.clear();
-			p_currCallbacks->m_failZeroList.clear();
-			// unused, but we need it to keep at least one reference until all callbacks are executed
-			Q_UNUSED(ref)
-		};
-		// post event for object with correct thread affinity
-		QCoreApplication::postEvent(p_currObject, p_Evt);
-	}	
+
+		// execute all done callbacks
+		for (int k = 0; k < p_currCallbacks->m_doneList.count(); k++)
+		{
+			auto &currConnection = p_currCallbacks->m_doneList[k].connection;
+			auto &currCallback   = p_currCallbacks->m_doneList[k].callback;
+			// execute according to connection type
+			if (currConnection == Qt::DirectConnection || (currConnection == Qt::AutoConnection && p_currThread == QThread::currentThread()))
+			{
+				// call directly with arguments
+				m_finishedFunction(currCallback);
+			}
+			else if (currConnection == Qt::QueuedConnection || (currConnection == Qt::AutoConnection && p_currThread != QThread::currentThread()))
+			{
+				// create object in heap and assign function (event loop takes ownership and deletes it later)
+				QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+				p_Evt->m_eventFunc = [ref, this, currCallback]() mutable {
+					// call in thread with arguments
+					m_finishedFunction(currCallback);
+					// unused, but we need it to keep at least one reference until all callbacks are executed
+					Q_UNUSED(ref)
+				};
+				// post event for object with correct thread affinity
+				QCoreApplication::postEvent(p_currObject, p_Evt);
+			}
+			else
+			{
+				Q_ASSERT_X(false, "QDeferredData<Types...>::resolve", "Unsupported connection type.");
+			}
+		} // done callbacks
+
+		// execute all done zero callbacks
+		for (int k = 0; k < p_currCallbacks->m_doneZeroList.count(); k++)
+		{
+			auto &currConnection = p_currCallbacks->m_doneZeroList[k].connection;
+			auto &currCallback   = p_currCallbacks->m_doneZeroList[k].callback;
+			// execute according to connection type
+			if (currConnection == Qt::DirectConnection || (currConnection == Qt::AutoConnection && p_currThread == QThread::currentThread()))
+			{
+				// call directly
+				currCallback();
+			}
+			else if (currConnection == Qt::QueuedConnection || (currConnection == Qt::AutoConnection && p_currThread != QThread::currentThread()))
+			{
+				// create object in heap and assign function (event loop takes ownership and deletes it later)
+				QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+				p_Evt->m_eventFunc = [ref, this, currCallback]() mutable {
+					// call in thread
+					currCallback();
+					// unused, but we need it to keep at least one reference until all callbacks are executed
+					Q_UNUSED(ref)
+				};
+				// post event for object with correct thread affinity
+				QCoreApplication::postEvent(p_currObject, p_Evt);
+			}
+			else
+			{
+				Q_ASSERT_X(false, "QDeferredData<Types...>::resolve", "Unsupported connection type.");
+			}
+		} // done zero callbacks
+
+		// clear callbacks since wont be used again, except progress because it can be used continously
+		p_currCallbacks->m_doneList.clear();
+		p_currCallbacks->m_failList.clear();
+		//p_currCallbacks->m_progressList.clear(); // NOTE : do not clear
+		p_currCallbacks->m_doneZeroList.clear();
+		p_currCallbacks->m_failZeroList.clear();
+
+	} // for each thread
 }
 
 template<class ...Types>
@@ -306,42 +370,87 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 	// change state
 	m_state = QDeferredState::REJECTED;
 	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after reject)
-	// [GCC_DEF_FIX] : below not working in GCC (https://stackoverflow.com/questions/18871122/compiler-bug-or-non-standard-code-variadic-template-capture-in-lambda)
-	//m_finishedFunction = [args...](std::function<void(Types(&...args))> callback) mutable {
-	//	callback(args...);
-	//};
 	m_finishedFunction = std::bind(GCC_DEF_FIX::finishedFunctionTemplate<Types...>, std::placeholders::_1, args...);
 
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
-	while (i.hasNext())
+	while (i.hasNext()) 
 	{
 		i.next();
-		// set test function
-		auto p_currThread    = i.key();
-		auto p_currObject    = QDeferredDataBase::getObjectForThread(p_currThread);
-		auto p_currCallbacks = m_callbacksMap[p_currThread];
-		// create object in heap and assign function (event loop takes ownership and deletes it later)
-		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [ref, this, p_currCallbacks]() mutable {
-			// execute all done callbacks
-			this->execute(p_currCallbacks->m_failList); // FAIL
-			// loop all done zero callbacks
-			this->executeZero(p_currCallbacks->m_failZeroList);  // FAIL
-			// clear callbacks since wont be used again, except progress because it can be used continously
-			p_currCallbacks->m_doneList    .clear();
-			p_currCallbacks->m_failList    .clear();
-			//p_currCallbacks->m_progressList.clear(); // NOTE
-			p_currCallbacks->m_doneZeroList.clear();
-			p_currCallbacks->m_failZeroList.clear();
-			// unused, but we need it to keep at least one reference until all callbacks are executed
-			Q_UNUSED(ref)
-		};
-		// post event for object with correct thread affinity
-		QCoreApplication::postEvent(p_currObject, p_Evt);
-	}
-}
+		// get data for current thread
+		auto p_currThread     = i.key();
+		auto p_currObject     = QDeferredDataBase::getObjectForThread(p_currThread);
+		auto p_currCallbacks  = m_callbacksMap[p_currThread];
 
+		// execute all fail callbacks
+		for (int k = 0; k < p_currCallbacks->m_failList.count(); k++)
+		{
+			auto &currConnection = p_currCallbacks->m_failList[k].connection;
+			auto &currCallback   = p_currCallbacks->m_failList[k].callback;
+			// execute according to connection type
+			if (currConnection == Qt::DirectConnection || (currConnection == Qt::AutoConnection && p_currThread == QThread::currentThread()))
+			{
+				// call directly with arguments
+				m_finishedFunction(currCallback);
+			}
+			else if (currConnection == Qt::QueuedConnection || (currConnection == Qt::AutoConnection && p_currThread != QThread::currentThread()))
+			{
+				// create object in heap and assign function (event loop takes ownership and deletes it later)
+				QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+				p_Evt->m_eventFunc = [ref, this, currCallback]() mutable {
+					// call in thread with arguments
+					m_finishedFunction(currCallback);
+					// unused, but we need it to keep at least one reference until all callbacks are executed
+					Q_UNUSED(ref)
+				};
+				// post event for object with correct thread affinity
+				QCoreApplication::postEvent(p_currObject, p_Evt);
+			}
+			else
+			{
+				Q_ASSERT_X(false, "QDeferredData<Types...>::resolve", "Unsupported connection type.");
+			}
+		} // fail callbacks
+
+		// execute all fail zero callbacks
+		for (int k = 0; k < p_currCallbacks->m_failZeroList.count(); k++)
+		{
+			auto &currConnection = p_currCallbacks->m_failZeroList[k].connection;
+			auto &currCallback   = p_currCallbacks->m_failZeroList[k].callback;
+			// execute according to connection type
+			if (currConnection == Qt::DirectConnection || (currConnection == Qt::AutoConnection && p_currThread == QThread::currentThread()))
+			{
+				// call directly
+				currCallback();
+			}
+			else if (currConnection == Qt::QueuedConnection || (currConnection == Qt::AutoConnection && p_currThread != QThread::currentThread()))
+			{
+				// create object in heap and assign function (event loop takes ownership and deletes it later)
+				QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+				p_Evt->m_eventFunc = [ref, this, currCallback]() mutable {
+					// call in thread
+					currCallback();
+					// unused, but we need it to keep at least one reference until all callbacks are executed
+					Q_UNUSED(ref)
+				};
+				// post event for object with correct thread affinity
+				QCoreApplication::postEvent(p_currObject, p_Evt);
+			}
+			else
+			{
+				Q_ASSERT_X(false, "QDeferredData<Types...>::reject", "Unsupported connection type.");
+			}
+		} // fail zero callbacks
+
+		// clear callbacks since wont be used again, except progress because it can be used continously
+		p_currCallbacks->m_doneList.clear();
+		p_currCallbacks->m_failList.clear();
+		//p_currCallbacks->m_progressList.clear(); // NOTE : do not clear
+		p_currCallbacks->m_doneZeroList.clear();
+		p_currCallbacks->m_failZeroList.clear();
+
+	} // for each thread
+}
 
 template<class ...Types>
 void QDeferredData<Types...>::rejectZero(QDeferred<Types...> ref)
@@ -366,24 +475,40 @@ void QDeferredData<Types...>::rejectZero(QDeferred<Types...> ref)
 		auto p_currThread    = i.key();
 		auto p_currObject    = QDeferredDataBase::getObjectForThread(p_currThread);
 		auto p_currCallbacks = m_callbacksMap[p_currThread];
-		// create object in heap and assign function (event loop takes ownership and deletes it later)
-		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [ref, this, p_currCallbacks]() mutable {
-			// NOTE : normal execute not called because we do not have the arguments
-			//        therefore we do not have m_finishedFunction
-			// loop all done zero callbacks
-			this->executeZero(p_currCallbacks->m_failZeroList);  // FAIL
-			// clear 'zero' callbacks since wont be used again
-			//p_currCallbacks->m_doneList    .clear();
-			//p_currCallbacks->m_failList    .clear();
-			//p_currCallbacks->m_progressList.clear(); // NOTE : might use again
-			p_currCallbacks->m_doneZeroList.clear();
-			p_currCallbacks->m_failZeroList.clear();
-			// unused, but we need it to keep at least one reference until all callbacks are executed
-			Q_UNUSED(ref)
-		};
-		// post event for object with correct thread affinity
-		QCoreApplication::postEvent(p_currObject, p_Evt);
+
+		// execute all fail zero callbacks
+		for (int k = 0; k < p_currCallbacks->m_failZeroList.count(); k++)
+		{
+			auto &currConnection = p_currCallbacks->m_failZeroList[k].connection;
+			auto &currCallback   = p_currCallbacks->m_failZeroList[k].callback;
+			// execute according to connection type
+			if (currConnection == Qt::DirectConnection || (currConnection == Qt::AutoConnection && p_currThread == QThread::currentThread()))
+			{
+				// call directly
+				currCallback();
+			}
+			else if (currConnection == Qt::QueuedConnection || (currConnection == Qt::AutoConnection && p_currThread != QThread::currentThread()))
+			{
+				// create object in heap and assign function (event loop takes ownership and deletes it later)
+				QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+				p_Evt->m_eventFunc = [ref, this, currCallback]() mutable {
+					// call in thread
+					currCallback();
+					// unused, but we need it to keep at least one reference until all callbacks are executed
+					Q_UNUSED(ref)
+				};
+				// post event for object with correct thread affinity
+				QCoreApplication::postEvent(p_currObject, p_Evt);
+			}
+			else
+			{
+				Q_ASSERT_X(false, "QDeferredData<Types...>::rejectZero", "Unsupported connection type.");
+			}
+		} // fail zero callbacks
+
+		// clear only 'zero' callbacks since wont be used again
+		p_currCallbacks->m_doneZeroList.clear();
+		p_currCallbacks->m_failZeroList.clear();
 	}
 }
 
@@ -404,14 +529,6 @@ void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 	// not processed inmediatly after, then progress callbacks will be called with incorrect arguments
 	// (with the last agruments that were given to the last notify call, e.g. "3, 3, 3", instead of "1, 2, 3")
 	auto funcCacheArgs = std::bind(GCC_DEF_FIX::finishedFunctionTemplate<Types...>, std::placeholders::_1, args...);
-	auto funcCacheFun  = [funcCacheArgs](QList< std::function<void(Types(&...args))> > &listCallbacks) mutable {
-		// loop all callbacks
-		for (int i = 0; i < listCallbacks.length(); i++)
-		{
-			// call each callback with cached arguments
-			funcCacheArgs(listCallbacks.at(i));
-		}
-	};
 
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
@@ -422,33 +539,41 @@ void QDeferredData<Types...>::notify(QDeferred<Types...> ref, Types(&...args))
 		auto p_currThread    = i.key();
 		auto p_currObject    = QDeferredDataBase::getObjectForThread(p_currThread);
 		auto p_currCallbacks = m_callbacksMap[p_currThread];
-		// create object in heap and assign function (event loop takes ownership and deletes it later)
-		QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
-		p_Evt->m_eventFunc = [ref, this, p_currCallbacks, funcCacheFun]() mutable {
-			Q_UNUSED(ref);
-			// loop execute all progress callbacks
-			funcCacheFun(p_currCallbacks->m_progressList); // PROGRESS
-		};
-		// post event for object with correct thread affinity
-		QCoreApplication::postEvent(p_currObject, p_Evt);
-	}
+
+		for (int k = 0; k < p_currCallbacks->m_progressList.count(); k++)
+		{
+			auto &currConnection = p_currCallbacks->m_progressList[k].connection;
+			auto &currCallback   = p_currCallbacks->m_progressList[k].callback;
+			// execute according to connection type
+			if (currConnection == Qt::DirectConnection || (currConnection == Qt::AutoConnection && p_currThread == QThread::currentThread()))
+			{
+				// call directly
+				funcCacheArgs(currCallback);
+			}
+			else if (currConnection == Qt::QueuedConnection || (currConnection == Qt::AutoConnection && p_currThread != QThread::currentThread()))
+			{
+				// create object in heap and assign function (event loop takes ownership and deletes it later)
+				QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
+				p_Evt->m_eventFunc = [ref, this, funcCacheArgs, currCallback]() mutable {
+					// call in thread
+					funcCacheArgs(currCallback);
+					// unused, but we need it to keep at least one reference until all callbacks are executed
+					Q_UNUSED(ref)
+				};
+				// post event for object with correct thread affinity
+				QCoreApplication::postEvent(p_currObject, p_Evt);
+			}
+			else
+			{
+				Q_ASSERT_X(false, "QDeferredData<Types...>::notify", "Unsupported connection type.");
+			}
+		} // progress callbacks
+	} // for each thread
 }
 
 template<class ...Types>
-void QDeferredData<Types...>::execute(QList< std::function<void(Types(&...args))> > &listCallbacks)
-{
-	// loop all callbacks
-	for (int i = 0; i < listCallbacks.length(); i++)
-	{
-		// call each callback with arguments
-		m_finishedFunction(listCallbacks.at(i));
-		// [GCC_DEF_FIX] Code below not working due to GCC lambda-variadic_templates incompatibility, 
-		//listCallbacks.at(i)(args...);	
-	}
-}
-
-template<class ...Types>
-void QDeferredData<Types...>::doneZero(std::function<void()> callback)
+void QDeferredData<Types...>::doneZero(const std::function<void()> &callback,
+	                                   const Qt::ConnectionType &connection/* = Qt::AutoConnection*/)
 {
 	// call it inmediatly if already resolved
 	QMutexLocker locker(&m_mutex);
@@ -461,12 +586,13 @@ void QDeferredData<Types...>::doneZero(std::function<void()> callback)
 		// add object for thread if does not exists
 		auto p_callbacks = this->getCallbaksForThread();
 		// append to done zero callbacks list
-		p_callbacks->m_doneZeroList.append(callback);
+		p_callbacks->m_doneZeroList.append({ callback, connection });
 	}
 }
 
 template<class ...Types>
-void QDeferredData<Types...>::failZero(std::function<void()> callback)
+void QDeferredData<Types...>::failZero(const std::function<void()> &callback,
+	                                   const Qt::ConnectionType &connection/* = Qt::AutoConnection*/)
 {
 	// call it inmediatly if already rejected
 	QMutexLocker locker(&m_mutex);
@@ -479,18 +605,7 @@ void QDeferredData<Types...>::failZero(std::function<void()> callback)
 		// add object for thread if does not exists
 		auto p_callbacks = this->getCallbaksForThread();
 		// append to fail zero callbacks list
-		p_callbacks->m_failZeroList.append(callback);
-	}
-}
-
-template<class ...Types>
-void QDeferredData<Types...>::executeZero(QList< std::function<void()> > &listCallbacks)
-{
-	// loop all callbacks
-	for (int i = 0; i < listCallbacks.length(); i++)
-	{
-		// call each callback without arguments
-		listCallbacks.at(i)();
+		p_callbacks->m_failZeroList.append({ callback, connection });
 	}
 }
 

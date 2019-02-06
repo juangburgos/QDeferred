@@ -10,20 +10,9 @@
 #define CATCH_CONFIG_RUNNER
 #include "catch.hpp"
 
-// NOTE : * need to process all Qt events  manually at the end of every test
-//        because QDeferred works with the Qt event loop and Catch architecture
-//        doesn't seem to be well suited for testing code based on events.
-//        * that is why I also needed to provide a custom main() function, to
+// NOTE : * cannot use catch to test threaded functionality.
+//        * needed to provide a custom main() function, to
 //        be able to initialize the QCoreApplication.
-//        * furthermore, QCoreApplication::hasPendingEvents is obsolete and not
-//        thread-safe, neither are assertions in Catch.
-//        * in summary, although Catch is nice and simple, seems it won't
-//        scale for the task at hand.
-#define QT_PROCESS_ALL_EVENTS \
-while (QCoreApplication::hasPendingEvents()) \
-{ \
-QCoreApplication::processEvents(); \
-} 
 
 int main(int argc, char* argv[])
 {
@@ -50,8 +39,6 @@ TEST_CASE("Should call done callback after resolve called", "[done][resolve]")
 	});
 	// resolve
 	defer.resolve();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call fail callback after reject called", "[fail][reject]")
@@ -67,8 +54,6 @@ TEST_CASE("Should call fail callback after reject called", "[fail][reject]")
 	});
 	// reject
 	defer.reject();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should change state from pending to resolved after resolve called", "[done][resolve][state]")
@@ -84,8 +69,6 @@ TEST_CASE("Should change state from pending to resolved after resolve called", "
 	});
 	// resolve
 	defer.resolve();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should change state from pending to rejected after reject called", "[fail][reject][state]")
@@ -101,8 +84,6 @@ TEST_CASE("Should change state from pending to rejected after reject called", "[
 	});
 	// reject
 	defer.reject();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callback with simple argument after resolve called", "[done][resolve][args]")
@@ -117,8 +98,6 @@ TEST_CASE("Should call done callback with simple argument after resolve called",
 	});
 	// resolve
 	defer.resolve(i);
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call fail callback with simple argument after reject called", "[fail][reject][args]")
@@ -133,8 +112,6 @@ TEST_CASE("Should call fail callback with simple argument after reject called", 
 	});
 	// reject
 	defer.reject(i);
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callback with complex argument after resolve called", "[done][resolve][args]")
@@ -152,8 +129,6 @@ TEST_CASE("Should call done callback with complex argument after resolve called"
 	});
 	// resolve
 	defer.resolve(listArgs);
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call fail callback with complex argument after reject called", "[fail][reject][args]")
@@ -171,8 +146,6 @@ TEST_CASE("Should call fail callback with complex argument after reject called",
 	});
 	// reject
 	defer.reject(listArgs);
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callbacks in the order they were registered", "[done][resolve][multi]")
@@ -196,8 +169,6 @@ TEST_CASE("Should call done callbacks in the order they were registered", "[done
 	});
 	// resolve
 	defer.resolve();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call fail callbacks in the order they were registered", "[fail][reject][multi]")
@@ -221,8 +192,6 @@ TEST_CASE("Should call fail callbacks in the order they were registered", "[fail
 	});
 	// reject
 	defer.reject();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callback when argument of deferred is another deferred", "[done][resolve][args]")
@@ -242,8 +211,6 @@ TEST_CASE("Should call done callback when argument of deferred is another deferr
 	});
 	// resolve
 	deferOfDefer.resolve(defer);
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callback with argument when argument of deferred is another deferred", "[done][resolve][args]")
@@ -264,8 +231,6 @@ TEST_CASE("Should call done callback with argument when argument of deferred is 
 	});
 	// resolve
 	deferOfDefer.resolve(defer);
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call progress callback after notify called", "[progress][notify]")
@@ -280,8 +245,6 @@ TEST_CASE("Should call progress callback after notify called", "[progress][notif
 	});
 	// notify
 	defer.notify(i);
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call progress callback as many times as notify called", "[progress][notify]")
@@ -300,8 +263,6 @@ TEST_CASE("Should call progress callback as many times as notify called", "[prog
 	{
 		defer.notify(i);
 	}
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call multiple progress callback as many times as notify called", "[progress][notify]")
@@ -325,8 +286,6 @@ TEST_CASE("Should call multiple progress callback as many times as notify called
 	{
 		defer.notify(i);
 	}
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callback of when deferred when all deferreds resolve", "[when][done][resolve]")
@@ -355,8 +314,6 @@ TEST_CASE("Should call done callback of when deferred when all deferreds resolve
 	defer1.resolve();
 	defer2.resolve();
 	defer3.resolve();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call done callback of when deferred when all deferreds of different types resolve", "[when][done][resolve]")
@@ -390,8 +347,6 @@ TEST_CASE("Should call done callback of when deferred when all deferreds of diff
 	defer1.resolve(i);
 	defer2.resolve(d);
 	defer3.resolve(list);
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call then resolved callback after resolve called", "[then][resolve]")
@@ -408,8 +363,6 @@ TEST_CASE("Should call then resolved callback after resolve called", "[then][res
 	});
 	// resolve
 	defer1.resolve();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call chained then resolved callback after resolve called", "[then][resolve][chain]")
@@ -441,8 +394,6 @@ TEST_CASE("Should call chained then resolved callback after resolve called", "[t
 	});
 	// resolve
 	defer1.resolve();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call then rejected callback after rejected called", "[then][reject]")
@@ -465,8 +416,6 @@ TEST_CASE("Should call then rejected callback after rejected called", "[then][re
 	});
 	// reject first
 	defer1.reject(); // reject here
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call second chained then rejected callback after second rejected called", "[then][reject][chain]")
@@ -496,8 +445,6 @@ TEST_CASE("Should call second chained then rejected callback after second reject
 	});
 	// resolve
 	defer1.resolve();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call last chained then rejected callback after first rejected called", "[then][reject][chain]")
@@ -531,8 +478,6 @@ TEST_CASE("Should call last chained then rejected callback after first rejected 
 	});
 	// reject
 	defer1.reject(false);
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call last chained then rejected callback after second rejected called", "[then][reject][chain]")
@@ -568,8 +513,6 @@ TEST_CASE("Should call last chained then rejected callback after second rejected
 	});
 	// resolve
 	defer1.resolve();
-
-	QT_PROCESS_ALL_EVENTS
 }
 
 TEST_CASE("Should call last chained then rejected callback after third rejected called", "[then][reject][chain]")
@@ -607,6 +550,4 @@ TEST_CASE("Should call last chained then rejected callback after third rejected 
 	});
 	// resolve
 	defer1.resolve();
-
-	QT_PROCESS_ALL_EVENTS
 }
