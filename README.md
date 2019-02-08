@@ -5,9 +5,9 @@ A Qt C++ alternative for handling async code execution, specially useful for thr
 
 This library consists of two main helper classes:
 
-* `QLambdaThreadWorker` : to execute code in a thread.
+* `QLambdaThreadWorker` : execute code in a thread.
 
-* `QDeferred` : to passing data between threads.
+* `QDeferred` : pass data between threads.
 
 ## Why?
 
@@ -344,7 +344,7 @@ Just replace `$$PATH_TO_THIS_REPO` with the relative or absolute path to this re
 #include <QDeferred>
 ```
 
-Take a look at the [tests folder](./tests/) to see how projects are creacted. 
+Take a look at the [tests folder](./tests/) to see how projects are created. 
 
 ## Advanced QLambdaThreadWorker
 
@@ -370,15 +370,15 @@ int main(int argc, char *argv[])
 
 The previous example will count in a thread every second indefinetively.
 
-We pass as a first argument to the `startLoopInThread` method a lambda to get executed cyclically in the thread. As a second argument we pass a cycle time in miliseconds.
+We pass as a first argument to the `startLoopInThread` method, a lambda to get executed cyclically in the thread. As a second argument we pass the cycle time in miliseconds.
 
-Note that in the previous example the counting works because the `counter` variable is passed in *by-reference*, so the `counter++` actually acts on the same variable. We managed ot get away with it because we know that `a.exec()` is blocking, thus the `counter` variable exists as long as the `QCoreApplication` exists.
+Note that in the previous example, the counting works because the `counter` variable is passed in *by-reference*, so the `counter++` actually acts on the same variable. We managed to get away with it because we know that `a.exec()` is blocking, thus the `counter` variable exists as long as the `QCoreApplication` exists.
 
-The `startLoopInThread` method returns an `int` that works as a cycle handler. We can use the handler to stop the cycle later using the `stopLoopInThread` method:
+The `startLoopInThread` method returns an `int` that works as a cycle **handler**. We can use this handler to stop the cycle later using the `stopLoopInThread` method:
 
 ```c++
 int counter = 0;
-`QLambdaThreadWorker` state. worker;
+QLambdaThreadWorker worker;
 
 int handle = worker.startLoopInThread([&counter]() {
 	qDebug() << "Counting" << counter++;
@@ -389,9 +389,9 @@ QTimer::singleShot(5000, [worker, handle]() mutable {
 });
 ```
 
-The previous example will count in a thread from 0 to 4. Note the need of the `mutable` keyword in the `QTimer::singleShot` callback, because the `stopLoopInThread` modifies the `QLambdaThreadWorker` state.
+The previous example will count in a thread from 0 to 4 and then stop. Note the need of the `mutable` keyword in the `QTimer::singleShot` callback, because the `stopLoopInThread` modifies the `QLambdaThreadWorker` state.
 
-One important fact to underscore, is that even after calling the `startLoopInThread` method, the `QLambdaThreadWorker` is still reusable. Meaning we can still call the `execInThread` while a cyle is executing, and it will work:
+One important fact to underscore, is that even after calling the `startLoopInThread` method, the `QLambdaThreadWorker` is still reusable. Meaning we can still call the `execInThread` while a cyle is running, and it will work:
 
 ```c++
 int counter = 0;
@@ -420,17 +420,90 @@ Counting 5
 Counting 6
 ```
 
-Where both callbacks are being executed in the same thread. This is possible because a cycle in the thread leaves so much within executions, that we can use the same thread to do many other things.
+Both callbacks are being executed in the same thread. This is possible because a cycle in the thread leaves free time within executions, so we can use the same thread to do many other things on that free time.
 
-The callbacks will never overlap because `QLambdaThreadWorker` internally queues the callback executions in the Qt event loop, therefore they are all serialized.
+The executions will never overlap because `QLambdaThreadWorker` internally queues the callback executions in the Qt event loop, therefore they are all serialized by Qt.
 
-Finally, we can create as many loops as we want, just bear in mind we might need to keep track of the handles of we want to stop the cycles sometime in the future.
+Finally, we can create **as many loops as we want**, just bear in mind we might need to keep track of the handles if we want to stop the cycles sometime in the future.
 
-`QLambdaThreadWorker` was made to be reusable, this means you can still **move** an object to the thread handled by it using the `moveQObjectToThread` method, or just get a reference to the thread itself using the `getThread` method.
+`QLambdaThreadWorker` was made to be reusable, this means you can still **move** an object to the thread handled by it using, using the `moveQObjectToThread` method, or just get a reference to the thread itself using the `getThread` method.
 
 ## Advanced QDeferred
 
-TODO .
+The examples so far are fine and dandy, but what if we want to implement something more complicated, real life use case? 
+
+Let's take as an example a network client API. First we outline the requirements for this client:
+
+* The client needs to connect to a server based on a given Ip Addess, and should notify when it connects or if a connection error ocurred.
+
+* The client needs to be able to make requests to a remote server and notify when a reponse is available to a given request. An error should be notified if something went wrong when making the request.
+
+* All client operations should be not blocking and event based.
+
+So we start our implementation by creating a client class. We will make a `QObject` based class because we want to make use of signals and slots. Note that `QDeferred` is not incompatible with Qt's signals and slots, you can use both at the same time, as both have specific use-cases as we will see later.
+
+```c++
+#include <QObject>
+#include <QDeferred>
+#include <QLambdaThreadWorker>
+
+class MyClient : public QObject
+{
+    Q_OBJECT
+public:
+    explicit MyClient(QObject *parent = 0);
+    ~MyClient();
+
+    QDeferred<QString> connect(const QString &strAddress);
+
+    QDeferred<QString> request(const QString &strRequest);
+
+signals:
+	void disconnected();
+
+private:
+	bool m_isConnected;
+	QLambdaThreadWorker m_worker;
+};
+```
+
+Let's start by implementing the `connect` method. We will mock the network behaviour to keep things simple:
+
+```c++
+#include <QHostAddress>
+#include <QTimer>
+
+QDeferred<QString> MyClient::connect(const QString &strAddress);
+{
+	QDeferred<QString> retDefered;
+	
+	m_worker.execInThread([strAddress]() mutable {
+		// first check if the address is valid
+		QHostAddress address;
+		bool isOk = address.setAddress(strAddress);
+		if (!isOk)
+		{
+			m_isConnected = false;
+			retDefered.reject("Invalid Address");
+			return;
+		}
+		// at this point we instantiate a socket and try to connect
+		// but we will mock it as a 2 seconds delay and then connecting
+		QThread::sleep(2);
+		m_isConnected = true;
+		retDefered.resolve("Connected to " + strAddress);
+		// we also mock that after 2 minutes, the connection is lost
+		QTimer::singleShot(2 * 60 * 1000, [this]() {
+			m_isConnected = false;
+			emit this->disconnected();
+		});
+	});
+
+	return retDefered;
+}
+```
+
+TODO : finish...
 
 ---
 
