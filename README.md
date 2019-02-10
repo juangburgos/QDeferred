@@ -430,17 +430,9 @@ Finally, we can create **as many loops as we want**, just bear in mind we might 
 
 ## Advanced QDeferred
 
-The examples so far are fine and dandy, but what if we want to implement something more complicated, real life use case? 
+### Handling State
 
-Let's take as an example a network client API. First we outline the requirements for this client:
-
-* The client needs to connect to a server based on a given Ip Addess, and should notify when it connects or if a connection error ocurred.
-
-* The client needs to be able to make requests to a remote server and notify when a reponse is available to a given request. An error should be notified if something went wrong when making the request.
-
-* All client operations should be not blocking and event based.
-
-So we start our implementation by creating a client class. We will make a `QObject` based class because we want to make use of signals and slots. Note that `QDeferred` is not incompatible with Qt's signals and slots, you can use both at the same time, as both have specific use-cases as we will see later.
+Consider the case where we are tasked to design an async API for a network client, using `QDeferred` the API would look as follows:
 
 ```c++
 #include <QObject>
@@ -462,48 +454,139 @@ signals:
 	void disconnected();
 
 private:
-	bool m_isConnected;
 	QLambdaThreadWorker m_worker;
 };
 ```
 
-Let's start by implementing the `connect` method. We will mock the network behaviour to keep things simple:
+Note that our API also uses Qt's signals, they are not incompatible and they actually serve a different purpose than `QDeferred`.
+
+Qt's signals and slots are very good for handling **unexpected events**, for example that our client unexpectedly disconnects. While `QDeferred` is better suited for **expected events**, for example, after our client makes a *request* to the server, we expect a *response* soon after.
+
+Using a well designed `QDeferred` based API, we could use our client as follows:
 
 ```c++
-#include <QHostAddress>
-#include <QTimer>
+MyClient client;
 
-QDeferred<QString> MyClient::connect(const QString &strAddress);
-{
-	QDeferred<QString> retDefered;
-	
-	m_worker.execInThread([strAddress]() mutable {
-		// first check if the address is valid
-		QHostAddress address;
-		bool isOk = address.setAddress(strAddress);
-		if (!isOk)
-		{
-			m_isConnected = false;
-			retDefered.reject("Invalid Address");
-			return;
-		}
-		// at this point we instantiate a socket and try to connect
-		// but we will mock it as a 2 seconds delay and then connecting
-		QThread::sleep(2);
-		m_isConnected = true;
-		retDefered.resolve("Connected to " + strAddress);
-		// we also mock that after 2 minutes, the connection is lost
-		QTimer::singleShot(2 * 60 * 1000, [this]() {
-			m_isConnected = false;
-			emit this->disconnected();
-		});
-	});
+client.request("GET")
+.done([](QString strGetReponse){
+	// this callback for the GET request
+});
 
-	return retDefered;
-}
+client.request("POST")
+.done([](QString strPostReponse){
+	// this callback for the POST request
+});
 ```
 
-TODO : finish...
+Note, the two previous calls to the `request` method are async, and we don't know for sure which reponse will arrive first. But that doesn't matter because `QDeferred` calls the correct callback for each request.
+
+If we used Qt's signals and slots for this task, we would force the user of our client API to keep track of the state for each request, and figure out which reponse corresponds to which request.
+
+Talking about state, in our client example we forgot to make sure the client is connected before we can make a request. We could fix it by **nesting** our async calls as follows:
+
+```c++
+MyClient client;
+
+client.connect()
+.done([&client](QString strAddress) {
+	// nested
+	client.request("GET")
+	.done([](QString strGetReponse) {
+		// do something with 'strGetReponse'
+	});
+});
+```
+
+But this inmediatly looks wrong, what if the server we are connecting to has a state and it requires, for example, a series of login requests called in order? Then we would be forced to do something like this:
+
+```c++
+client.request("POST:login/user=bill,pass=123")
+.done([&client](QString strResponse) {
+	client.request("POST:select/account_1")
+	.done([&client](QString strResponse) {
+		client.request("POST:select/january")
+		.done([&client](QString strResponse) {
+			client.request("GET:balance")
+			.done([&client](QString strResponse) {
+				// and so on ..............
+			});
+		});
+	});
+});
+```
+
+This is what is called in other programming languages as the [pyramid of doom](https://en.wikipedia.org/wiki/Pyramid_of_doom_(programming)), which makes the code unreadible and difficult to debug.
+
+To solve this, `QDeferred` has a very handy method called `then` which allows us to **chain** the async operations of our client:
+
+```c++
+MyClient client;
+
+client.connect()
+.then<QString>([&client](QString strAddress) {
+	// do something reponse
+	return client.request("POST:login/user=bill,pass=123"); // NOTE : callback returns a QDeferred<QString>
+})
+.then<QString>([&client](QString strResponse) {
+	// do something reponse
+	return client.request("POST:select/account_1");
+})
+.then<QString>([&client](QString strResponse) {
+	// do something reponse
+	return client.request("POST:select/january");
+})
+.then<QString>([&client](QString strResponse) {
+	// do something reponse
+	return client.request("GET:balance");
+})
+.done([](QString strResponse) {
+	// finish
+});
+```
+
+The callback passed to the `then` method will only be executed if the deferred object is *resolved* (success), same as in the `done` method. The main difference is that the `then` method accepts a template argument, which is the template argument of the expected `QDeferred` object to be returned by the `then` callback.
+
+The code becomes more readible, because now the order of execution of the async operations is much more clear. It reads as:
+
+```
+connect, then login, then select account1, then select january, then get balance
+```
+
+Remember that all those callbacks are actually executed in order and in the thread in which they are defined. If any of those steps fails, then the rest of the callbacks are not executed. We have not yet handled errors, but for each step we could define an error callback:
+
+```c++
+MyClient client;
+
+client.connect()
+.fail([](QString strError){
+	qDebug() << "Failed connecting";
+})
+.then<QString>([&client](QString strAddress) {
+	// do something reponse
+	return client.request("POST:login/user=bill,pass=123"); // NOTE : callback returns a QDeferred<QString>
+})
+.fail([](QString strError){
+	qDebug() << "Failed logging in";
+})
+.then<QString>([&client](QString strResponse) {
+	// do something reponse
+	return client.request("GET:balance");
+})
+.fail([](QString strError){
+	qDebug() << "Failed getting balance";
+})
+.done([](QString strResponse) {
+	// finish
+});
+```
+
+This way we can know exactly in which step something went wrong.
+
+### Handling Progress
+
+There is another very handy feature of the `QDeferred` that allows notifying partial progress of an async operation.
+
+Say our example client before makes a request for a large amount of data over the network, ...
 
 ---
 

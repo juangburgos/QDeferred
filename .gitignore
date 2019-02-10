@@ -268,3 +268,4 @@ FakesAssemblies/
 /src/resources/mongoose.conf
 /tests/*.db
 /tests/*.opendb
+*.stash
