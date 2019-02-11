@@ -29,7 +29,7 @@ Qt already provides a work flow for safely execute code in threads which can be 
 
 I think this already explains the **why**, not only do we have to create two classes, but we have to remeber to implement all this signals and slots, connect them, move objects to threads, etc. And I almost forgot; is not like you can send any type using signals and slots, if you want so send a custom type you have to [do a lot of stuff to make your type Qt-compatible](https://doc.qt.io/qt-5/custom-types.html).
 
-Man, I just want to execute some code in a thread!
+Qt provides other classes that facilitate threaded and retrieval of results of async code execution, namely `QtConcurrent`, `QFuture` and `QFutureWatcher`. A comparison between `QtConcurrent` and `QDeferred` async code and their differences is shown in the last section of this document.
 
 ## QLambdaThreadWorker
 
@@ -90,6 +90,16 @@ In the previous snippet we passed the string *by-copy*. We could also pass varia
 Note that we can pass **any type** though the lambda capture. There is no need to register our custom types in the Qt's system.
 
 Now, to retrieve data from the thread we use the second part of the solution, the `QDeferred` class.
+
+**Note** : similar results can be achieved with `QtConcurrent` :
+
+```c++
+QFuture<void> future = QtConcurrent::run([=]() {
+    // Code in this block will run in another thread
+});
+```
+
+See the end of this document to see what advantages `QDeferred` provides.
 
 ## QDeferred
 
@@ -497,7 +507,7 @@ client.connect()
 });
 ```
 
-But this inmediatly looks wrong, what if the server we are connecting to has a state and it requires, for example, a series of login requests called in order? Then we would be forced to do something like this:
+But this inmediatly looks wrong, what if the server we are connecting to, has a state and it requires for example, a series of login requests called in order? Then we would be forced to do something like this:
 
 ```c++
 client.request("POST:login/user=bill,pass=123")
@@ -517,7 +527,7 @@ client.request("POST:login/user=bill,pass=123")
 
 This is what is called in other programming languages as the [pyramid of doom](https://en.wikipedia.org/wiki/Pyramid_of_doom_(programming)), which makes the code unreadible and difficult to debug.
 
-To solve this, `QDeferred` has a very handy method called `then` which allows us to **chain** the async operations of our client:
+To solve this, `QDeferred` has a very handy method called `then`, which allows us to **chain** the async operations of our client:
 
 ```c++
 MyClient client;
@@ -552,7 +562,7 @@ The code becomes more readible, because now the order of execution of the async 
 connect, then login, then select account1, then select january, then get balance
 ```
 
-Remember that all those callbacks are actually executed in order and in the thread in which they are defined. If any of those steps fails, then the rest of the callbacks are not executed. We have not yet handled errors, but for each step we could define an error callback:
+Remember that all those callbacks are actually executed in order, and in the thread in which they are defined. If any of those steps fails, then the rest of the callbacks are not executed. We have not yet handled errors, but for each step we could define a `fail` callback:
 
 ```c++
 MyClient client;
@@ -586,7 +596,269 @@ This way we can know exactly in which step something went wrong.
 
 There is another very handy feature of the `QDeferred` that allows notifying partial progress of an async operation.
 
-Say our example client before makes a request for a large amount of data over the network, ...
+Say we want to count from 1 to 10 in a thread and *notify* every time the count changes:
+
+```c++
+QLambdaThreadWorker worker;
+
+QDeferred<int> countToTen()
+{
+	QDeferred<int> retDefered;
+	QSharedPointer<int> handle(new int);
+	QSharedPointer<int> counter(new int);
+	// init counter
+	*counter = 0;
+	*handle  = worker.startLoopInThread([retDefered, handle, counter]() mutable {
+		// notify progress
+		retDefered.notify(++*counter);
+		// end counting
+		if (*counter == 10)
+		{
+			// stop thread
+			worker.stopLoopInThread(*handle);
+			retDefered.resolve(*counter);
+		}
+	}, 1000);
+
+	return retDefered;
+}
+```
+
+We use the `notify` method to notify *progress* of our async code execution. We pass to the method the current value of the progress.
+
+Note we needed to create `handle` and `counter` in the heap, because those variables need to exist throughout the whole counting life-cycle.
+
+To susbcribe to the progress we use the `progress` method and pass a callback to it. The coutning function is called as follows:
+
+```c++
+countToTen()
+.progress([](int counter) {
+	qDebug() << "Progress" << counter;
+})
+.done([](int counter) {
+	qDebug() << "Finished" << counter;
+});
+```
+
+The output would be:
+
+```
+Progress 1
+Progress 2
+Progress 3
+Progress 4
+Progress 5
+Progress 6
+Progress 7
+Progress 8
+Progress 9
+Progress 10
+Finished 10
+```
+
+### Handling Multiple QDeferred
+
+Consider a simplified version of our network client example:
+
+```c++
+struct MyClient
+{
+	QDefer connect()
+	{
+		QDefer retDefer;
+		m_worker.execInThread([retDefer]() mutable {
+			// sleep random 0 to 5 secs before resolving
+			static int seed = 123;
+			qsrand(++seed);
+			QThread::sleep(qrand() % 5);
+			// resolve
+			retDefer.resolve();
+		});
+		return retDefer;
+	};
+
+	QLambdaThreadWorker m_worker;
+};
+```
+
+The client has a `connect` method that get executed in a thread, and resolves after a random delay between 0 and 5 seconds.
+
+We create three instances of the client, and would like to execute some code once **all** of them have been connected. This could complicate our code, but luckly `QDeferred` has a handly **static** method called `QDefer::when` that allows us to sync the states of multiple `QDeferred` instances:
+
+```c++
+MyClient client1, client2, client3;
+// connect client 1
+auto defer1 = client1.connect()
+.done([]() {
+	qDebug() << "Client 1 connected";
+});
+// connect client 2
+auto defer2 = client2.connect()
+.done([]() {
+	qDebug() << "Client 2 connected";
+});
+// connect client 3
+auto defer3 = client3.connect()
+.done([]() {
+	qDebug() << "Client 3 connected";
+});
+
+// execute callback when all connected
+QDefer::when(defer1, defer2, defer3)
+.done([]() {
+	qDebug() << "All clients connected";
+});
+```
+
+One execution of the previous code could output:
+
+```
+Client 3 connected
+Client 2 connected
+Client 1 connected
+All clients connected
+```
+
+The next execution could output:
+
+```
+Client 3 connected
+Client 1 connected
+Client 2 connected
+All clients connected
+```
+
+It doesn't matter which `QDeferred` instances are resolved first or when they are resolved, the `QDefer::when` method waits until all of them are resolved and then executes its own `done` callback. Of course if **at least one** `QDeferred` is rejected, then the `fail` callback of the `QDefer::when` method is called.
+
+It is not necesary that all the `QDeferred` instances passed to the `QDefer::when` method are of the same template type. The following code is also valid:
+
+```c++
+QDeferred<int>            defer1;
+QDeferred<double>         defer2;
+QDeferred<QList<QString>> defer3;
+
+// ...
+
+QDefer::when(defer1, defer2, defer3)
+.done([]() {
+	qDebug() << "All done";
+})
+.fail([](){
+	qDebug() << "At leats one failed";
+});
+```
+
+### QDeferred State
+
+One last thing to mention is that once a `QDeferred` instances has been resolved or rejected, it is not possible to resolve or reject it again.
+
+Therefore sometimes it might be handy to test the **state** of a deferred instance before trying to resolve/reject it:
+
+```c++
+QDeferred<int> defer;
+
+if (defer.state() == QDeferredState::PENDING)
+{
+	defer.resolve(123);
+}
+```
+
+The `QDeferredState` enum has only three possible values:
+
+* `PENDING` : not *resolved* nor *rejected*.
+
+* `RESOLVED` : already *resolved*.
+
+* `REJECTED` : already *rejected*.
+
+Using the `state` method we can now if an async operation has been already processed.
+
+
+## QDeferred vs QtConcurrent
+
+Qt provides its own classes to facilitate the execution of threaded async code. In many ways, very similar results can be achieved using both approaches. For example, to multiply two numbers in a thread:
+
+```c++
+// Using QtConcurrent
+
+QFuture<int> future;
+QFutureWatcher<int> watcher;
+QObject::connect(&watcher, &QFutureWatcher<int>::finished, [&future]() {
+	qDebug() << "Result QFuture" << future.result();
+});
+future = QtConcurrent::run([]() {
+	return 4 * 3;
+});
+watcher.setFuture(future);
+
+// Using QDeferred
+
+QLambdaThreadWorker worker;
+QDeferred<int> def;
+worker.execInThread([def]() mutable {
+	def.resolve(4 * 3);
+});
+def.done([](int result) {
+	qDebug() << "Result QDeferred" << result;
+});
+```
+
+So both APIs allow similar results with similar ease. But `QDeferred` providesa couple of advantages with respect to the `QtConcurrent` approach:
+
+* It allows for multiple template arguments.
+
+```c++
+QLambdaThreadWorker worker;
+QDeferred<int, QString, QList<double>> def;
+worker.execInThread([def]() mutable {
+	def.resolve(123, "hello", QList<double>() << 1.1 << 2.2 << 3.3);
+});
+def.done([](int result, QString string, QList<double> list) {
+	qDebug() << "Result QDeferred" << result;
+	qDebug() << "Result QDeferred" << string;
+	qDebug() << "Result QDeferred" << list;
+});
+```
+
+En the example above we define 3 template arguments for the `QDeferred`, which allows us to pass back 3 variables as a result.
+
+* It allows chaining of async operations.
+
+```c++
+MyClient client;
+
+client.connect()
+.then<QString>([&client](QString strAddress) {
+	// do something reponse
+	return client.request("POST:login/user=bill,pass=123"); // chaining : returns a QDeferred
+})
+.then<QString>([&client](QString strResponse) {
+	// do something reponse
+	return client.request("GET:balance"); // chaining
+})
+.done([](QString strResponse) {
+	// finish
+});
+```
+
+See the *Handling State* section for more info.
+
+* Allows *non-blocking* sync of `QDeferred` instances.
+
+```c++
+```c++
+QDeferred<double> defer1, defer2, defer3;
+
+// ...
+
+// non-blocking : execute callback when all resolved
+QDefer::when(defer1, defer2, defer3)
+.done([]() {
+	qDebug() << "All resolved";
+});
+```
+
+Similar to what can be done with `QFutureSynchronizer`, but non-blocking. See the *Handling Multiple QDeferred* section.
 
 ---
 
