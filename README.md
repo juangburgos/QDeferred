@@ -681,7 +681,7 @@ struct MyClient
 };
 ```
 
-The client has a `connect` method that get executed in a thread, and resolves after a random delay between 0 and 5 seconds.
+The client has a `connect` method that gets executed in a thread, and resolves after a random delay between 0 and 5 seconds.
 
 We create three instances of the client, and would like to execute some code once **all** of them have been connected. This could complicate our code, but luckly `QDeferred` has a handly **static** method called `QDefer::when` that allows us to sync the states of multiple `QDeferred` instances:
 
@@ -728,7 +728,7 @@ Client 2 connected
 All clients connected
 ```
 
-It doesn't matter which `QDeferred` instances are resolved first or when they are resolved, the `QDefer::when` method waits until all of them are resolved and then executes its own `done` callback. Of course if **at least one** `QDeferred` is rejected, then the `fail` callback of the `QDefer::when` method is called.
+It doesn't matter which `QDeferred` instances are resolved first or when they are resolved, the `QDefer::when` method waits (not-blocking) until all of them are resolved and then executes its own `done` callback. Of course if **at least one** `QDeferred` is rejected, then the `fail` callback of the `QDefer::when` method is called.
 
 It is not necesary that all the `QDeferred` instances passed to the `QDefer::when` method are of the same template type. The following code is also valid:
 
@@ -744,7 +744,7 @@ QDefer::when(defer1, defer2, defer3)
 	qDebug() << "All done";
 })
 .fail([](){
-	qDebug() << "At leats one failed";
+	qDebug() << "At least one failed";
 });
 ```
 
@@ -803,7 +803,7 @@ def.done([](int result) {
 });
 ```
 
-So both APIs allow similar results with similar ease. But `QDeferred` providesa couple of advantages with respect to the `QtConcurrent` approach:
+So both APIs allow similar results with similar ease. But `QDeferred` provides a couple of advantages with respect to the `QtConcurrent` approach:
 
 * It allows for multiple template arguments.
 
@@ -845,7 +845,6 @@ See the *Handling State* section for more info.
 
 * Allows *non-blocking* sync of `QDeferred` instances.
 
-```c++
 ```c++
 QDeferred<double> defer1, defer2, defer3;
 
