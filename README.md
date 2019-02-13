@@ -31,6 +31,28 @@ I think this already explains the **why**, not only do we have to create two cla
 
 Qt provides other classes that facilitate threaded and retrieval of results of async code execution, namely `QtConcurrent`, `QFuture` and `QFutureWatcher`. A comparison between `QtConcurrent` and `QDeferred` async code and their differences is shown in the last section of this document.
 
+`QDeferred` is not *the one and only solution* for your threaded code execution problems, but just another tool that can help create nice async APIs, easy to read and write code. See the *Conclusions and Recommendations* section at the end of this document for recommendations on when to use `QDeferred`.
+
+## Include
+
+To include this library in your project, just include [qlambdathreadworker.pri](./src/qlambdathreadworker.pri) and [qdeferred.pri](./src/qdeferred.pri) in your QMake Project file (`*.pro` file) as follows:
+
+```cmake
+include($$PATH_TO_THIS_REPO/src/qdeferred.pri)
+include($$PATH_TO_THIS_REPO/src/qlambdathreadworker.pri)
+```
+
+Just replace `$$PATH_TO_THIS_REPO` with the relative or absolute path to this repo. Then in your C++ code include the headers:
+
+```c++
+#include <QLambdaThreadWorker>
+#include <QDeferred>
+```
+
+Take a look at the [tests folder](./tests/) to see how projects are created.
+
+This library requires **C++11**.
+
 ## QLambdaThreadWorker
 
 This class is the first of two parts of the proposed solution. To execute code in a thread we use `QLambdaThreadWorker` as follows:
@@ -335,26 +357,6 @@ Execution in thread : QThread(0x178e39baaf0)
 Result in thread : QThread(0x178e39ba640)
 3 * 4 = 12
 ```
-
-The only thing missing is how to include this library in your project so you can start using it right away!
-
-## Include
-
-To include this library in your project, just include [qlambdathreadworker.pri](./src/qlambdathreadworker.pri) and [qdeferred.pri](./src/qdeferred.pri) in your QMake Project file (`*.pro` file) as follows:
-
-```cmake
-include($$PATH_TO_THIS_REPO/src/qdeferred.pri)
-include($$PATH_TO_THIS_REPO/src/qlambdathreadworker.pri)
-```
-
-Just replace `$$PATH_TO_THIS_REPO` with the relative or absolute path to this repo. Then in your C++ code include the headers:
-
-```c++
-#include <QLambdaThreadWorker>
-#include <QDeferred>
-```
-
-Take a look at the [tests folder](./tests/) to see how projects are created. 
 
 ## Advanced QLambdaThreadWorker
 
@@ -773,6 +775,65 @@ The `QDeferredState` enum has only three possible values:
 
 Using the `state` method we can now if an async operation has been already processed.
 
+### QDeferred in the same Thread
+
+We don't need a thread to use `QDeferred`. Very much as Qt's signals and slots, `QDeferred` accepts a [Qt::ConnectionType](https://doc.qt.io/qt-5/qt.html#ConnectionType-enum) as an argument to each of its *consumer* API callbacks (`done`, `fail` and `progress`). This gives control over which thread is used to execute the callback, by default all callbacks have a `Qt::AutoConnection` connection type.
+
+```c++
+// Qt::DirectConnection explicitly forces to execute the 'progress' in the same thread in which 'notify' is called
+// but this would happen by default anyway because Qt::AutoConnection figures aout both methods exist in the same thread.
+defer.progress([](int val) {
+	qDebug() << "Counting in the same thread :" << val;
+}, Qt::DirectConnection);
+
+for (int i = 0; i < 100; i++)
+{
+	// Will print de debug message inmediatly
+	defer.notify(i + 1);
+}
+```
+
+If we would like to wait until the next execution of the Qt event loop we could force it as follows:
+
+```c++
+// The debug messages will be executed 'later' on the next Qt event loop iteration
+defer.progress([](int val) {
+	qDebug() << "Counting in the same thread :" << val;
+}, Qt::QueuedConnection);
+
+for (int i = 0; i < 100; i++)
+{
+	defer.notify(i + 1);
+}
+```
+
+### Multiple Subscribers
+
+A `QDeferred` instance is an [explicitly shared object](https://doc.qt.io/qt-5/qexplicitlyshareddatapointer.html), this means it can be passed around by copy, and all these copies reference to the same internal instance. This means we can reuse a `QDeferred` instance, pass it around and subscribe to `done`, `fail` or `progress` callbacks elsewhere in the code:
+
+```c++
+QDeferred<int> defer = myMethod()
+.done([](int val) {
+	qDebug() << val;
+})
+.fail([](int val) {
+	qDebug() << val;
+});
+
+// we can pass "defer" around since is a explicitly shared object
+// ...
+
+// subscribe elsewhere
+defer
+.done([](int val) {
+	qDebug() << val;
+})
+.fail([](int val) {
+	qDebug() << val;
+});
+```
+
+If the `QDeferred` was already resolved/rejected when a new subscription is done, then the callback is called inmediatly (depending on the connection-type).
 
 ## QDeferred vs QtConcurrent
 
@@ -858,6 +919,68 @@ QDefer::when(defer1, defer2, defer3)
 ```
 
 Similar to what can be done with `QFutureSynchronizer`, but non-blocking. See the *Handling Multiple QDeferred* section.
+
+# Conclusion and Recommendations
+
+As we saw on the examples throughout this document, `QDeferred` is just another tool that can be used alongside other Qt APIs for threaded and async code execution. In special, `QDeferred` was designed for solving the issue of calling async code in another thread, and retrieving the result to the calling thread. Below is a list of recommended API for some specific use cases:
+
+* `Unexpected Events` : For unexpected events within threads, [Qt's signals and slots](https://doc.qt.io/qt-5/signalsandslots.html) is still the best solution. For example and unexpected network client disconnection.
+
+* `Expected Events` : For calling code in a thread and retrieving results or progress to the calling thread, then `QDeferred` is recommended as an alternative of `QtConcurrent` and `QFuture`. Of course if the `QFuture` API fullfills your certain needs better, then by all means stick with it. You can still use `QDeferred` elsewhere in your code wherever it fits better. Examples of this use case are a network client request/response cycle, or large file operations.
+
+* `Batch Processing` : For processing data in parallel, [QThreadPool](https://doc.qt.io/qt-5/qthreadpool.html) is the best solution. Examples can be a network server or image processing.
+
+In regards to `QLambdaThreadWorker`, it was designed as a companion to `QDeferred` in order to easier manage a long term living thread. Mainly to hide thread management to the user of an API. It is better used as a member of a class:
+
+```c++
+class MyClient
+{
+	QDefer connect()
+	{
+		QDefer retDefer;
+		m_worker.execInThread([retDefer]() mutable {
+			// here create a socket, subscribe to connect event, and when connected then...
+			// ...
+			// resolve
+			retDefer.resolve();
+			// update internal variables
+			m_strPeerName = socket->peerName();
+		});
+		return retDefer;
+	};
+
+	QDeferred<QString> getPeerName()
+	{
+		QDeferred<QString> retDefer;
+		m_worker.execInThread([retDefer]() mutable {
+			// serialize all access to data used in another thread
+			retDefer.resolve(m_strPeerName);
+		});
+		return retDefer;
+	};
+
+	QString m_strPeerName;
+	QLambdaThreadWorker m_worker;
+};
+```
+
+It is adviced to serialize read and write access to data used in a thread to avoid the common pitfalls of threading (race-conditions, etc.). By serializing access to the `m_strPeerName` variable in the example above we avoid to use mutexes and other constructs that can increase the complexity of our application. Access data directly (read/write) only within one thread, use mechanisms such as `QDeferred` to access it indirectly between different threads and all should be fine.
+
+Remember to make good use of the `then` method:
+
+```c++
+MyClient client;
+
+client.connect()
+.then<QString>([&client](){
+	return client.getPeerName();
+})
+.done([](QString strPeerName){
+	qDebug() << "Connected to" << strPeerName;
+});
+```
+
+And finally remember to make sure that any lamba captures made by reference live long enough for the execution of your callbacks. E.g. in the example above make sure `client` lives until after the `then` and `done` callbacks are executed.
 
 ---
 
