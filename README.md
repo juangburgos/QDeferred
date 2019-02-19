@@ -658,6 +658,22 @@ Progress 10
 Finished 10
 ```
 
+Do not let `QDeferred` fool you into thinking that the progress *type* cannot be separated from the result *type*. In the previous example, the type used to report progress `<int>` is also used to *resolve* the result. Bet let's not forget that `QDeferred` accepts N template types, so we could separate progress and result types as follows:
+
+```c++
+QDeferred<QByteArray, int, QString> defer = myMethod()
+.progress([](QByteArray result, int progress, QString message) {
+	Q_UNUSED(result);
+	qDebug() << "Progress" << progress << "% , details :" << message;
+})
+.done([](QByteArray result, int progress, QString message) {
+	Q_UNUSED(progress, message);
+	// do something with the QByteArray results
+});
+```
+
+In the previous snippet, progress types are (arbitrarily) selected to be `int, QString`, while result type is `QByteArray`. The fact that we can define N template types does not mean we have to use all of them in all callbacks. We can just use some of them for progress and pass in default/empty values for the others. Then use the others for results and ignore the types used for progress. This gives `QDeferred` a lot of flexibility to define whatever types the user deems necessary for each use case.
+
 ### Handling Multiple QDeferred
 
 Consider a simplified version of our network client example:
