@@ -24,18 +24,26 @@ public:
 	// get state method
 	QDeferredState state() const;
 
-	// done method	
-	QDeferred<Types...> done(const std::function<void(Types(...args))> &callback,  // by copy would be <Types... arg>
-		const Qt::ConnectionType &connection = Qt::AutoConnection);
+	// done method
+	QDeferred<Types...> done(
+		const std::function<void(Types(...args))> &callback,
+		const Qt::ConnectionType                  &connection = Qt::AutoConnection);
 
 	// fail method
-	QDeferred<Types...> fail(const std::function<void(Types(...args))> &callback,
-		const Qt::ConnectionType &connection = Qt::AutoConnection);
+	QDeferred<Types...> fail(
+		const std::function<void(Types(...args))> &callback,
+		const Qt::ConnectionType                  &connection = Qt::AutoConnection);
 
 	// then method
 	template<class ...RetTypes, typename T>
-	QDeferred<RetTypes...> then(const T &doneCallback,
+	QDeferred<RetTypes...> then(
+		const T                  &doneCallback,
 		const Qt::ConnectionType &connection = Qt::AutoConnection);
+	// then method specialization
+	template<class ...RetTypes>
+	QDeferred<RetTypes...> then(
+		const std::function<QDeferred<RetTypes...>(Types(...args))> &doneCallback,
+		const Qt::ConnectionType                                    &connection = Qt::AutoConnection);
 
 	// then method
 	template<class ...RetTypes, typename T>
@@ -43,10 +51,17 @@ public:
 		const T                      &doneCallback,
 		const std::function<void()>  &failCallback,
 		const Qt::ConnectionType     &connection = Qt::AutoConnection);
+	// then method specialization
+	template<class ...RetTypes>
+	QDeferred<RetTypes...> then(
+		const std::function<QDeferred<RetTypes...>(Types(...args))> &doneCallback,
+		const std::function<void()>                                 &failCallback,
+		const Qt::ConnectionType                                    &connection = Qt::AutoConnection);
 
 	// progress method
-	QDeferred<Types...> progress(const std::function<void(Types(...args))> &callback,
-		const Qt::ConnectionType &connection = Qt::AutoConnection);
+	QDeferred<Types...> progress(
+		const std::function<void(Types(...args))> &callback,
+		const Qt::ConnectionType                  &connection = Qt::AutoConnection);
 
 	// extra consume API (static)
 
@@ -89,6 +104,18 @@ private:
 	void failZero(const std::function<void()> &callback,
 		const Qt::ConnectionType &connection = Qt::AutoConnection);
 
+	// then method specialization internal
+	template<class ...RetTypes>
+	QDeferred<RetTypes...> thenAlias(
+		const std::function<QDeferred<RetTypes...>(Types(...args))> &doneCallback,
+		const Qt::ConnectionType                                    &connection = Qt::AutoConnection);
+
+	// then method specialization internal
+	template<class ...RetTypes>
+	QDeferred<RetTypes...> thenAlias(
+		const std::function<QDeferred<RetTypes...>(Types(...args))> &doneCallback,
+		const std::function<void()>                                 &failCallback,
+		const Qt::ConnectionType                                    &connection = Qt::AutoConnection);
 };
 
 // alias for no argument types
@@ -130,8 +157,9 @@ QDeferredState QDeferred<Types...>::state() const
 }
 
 template<class ...Types>
-QDeferred<Types...> QDeferred<Types...>::done(const std::function<void(Types(...args))> &callback,
-	const Qt::ConnectionType &connection/* = Qt::AutoConnection*/)
+QDeferred<Types...> QDeferred<Types...>::done(
+	const std::function<void(Types(...args))> & callback, 
+	const Qt::ConnectionType                  & connection/* = Qt::AutoConnection*/)
 {
 	// check if valid
 	Q_ASSERT_X(callback, "Deferred done method.", "Invalid done callback argument");
@@ -152,12 +180,29 @@ QDeferred<Types...> QDeferred<Types...>::fail(const std::function<void(Types(...
 template<class ...Types>
 template<class ...RetTypes, typename T>
 QDeferred<RetTypes...> QDeferred<Types...>::then(
-	const T &doneCallback,
+	const T                  &doneCallback,
 	const Qt::ConnectionType &connection/* = Qt::AutoConnection*/)
 {
+	return this->thenAlias<RetTypes...>((std::function<QDeferred<RetTypes...>(Types(...args))>)doneCallback, connection);
+}
+
+template<class ...Types>
+template<class ...RetTypes>
+QDeferred<RetTypes...> QDeferred<Types...>::then(
+	const std::function<QDeferred<RetTypes...>(Types(...args))> & doneCallback,
+	const Qt::ConnectionType                                    & connection/* = Qt::AutoConnection*/)
+{
+	return this->thenAlias<RetTypes...>(doneCallback, connection);
+}
+
+template<class ...Types>
+template<class ...RetTypes>
+QDeferred<RetTypes...> QDeferred<Types...>::thenAlias(
+	const std::function<QDeferred<RetTypes...>(Types(...args))> & doneCallback,
+	const Qt::ConnectionType                                    & connection/* = Qt::AutoConnection*/)
+{
 	// check if valid
-	Q_ASSERT_X((std::function<QDeferred<RetTypes...>(Types(...args))>)doneCallback, 
-		       "Deferred then method.", "Invalid done callback as first argument");
+	Q_ASSERT_X(doneCallback, "Deferred then method.", "Invalid done callback as first argument");
 
 	// create deferred to return
 	QDeferred<RetTypes...> retPromise;
@@ -193,13 +238,32 @@ QDeferred<RetTypes...> QDeferred<Types...>::then(
 template<class ...Types>
 template<class ...RetTypes, typename T>
 QDeferred<RetTypes...> QDeferred<Types...>::then(
-	const T &doneCallback,
-	const std::function<void()>                                 &failCallback,
-	const Qt::ConnectionType &connection/* = Qt::AutoConnection*/)
+	const T                     &doneCallback,
+	const std::function<void()> &failCallback,
+	const Qt::ConnectionType    &connection/* = Qt::AutoConnection*/)
+{
+	return this->thenAlias<RetTypes...>((std::function<QDeferred<RetTypes...>(Types(...args))>)doneCallback, failCallback, connection);
+}
+
+template<class ...Types>
+template<class ...RetTypes>
+QDeferred<RetTypes...> QDeferred<Types...>::then(
+	const std::function<QDeferred<RetTypes...>(Types(...args))> & doneCallback,
+	const std::function<void()>                                 & failCallback, 
+	const Qt::ConnectionType                                    & connection/* = Qt::AutoConnection*/)
+{
+	return this->thenAlias<RetTypes...>(doneCallback, failCallback, connection);
+}
+
+template<class ...Types>
+template<class ...RetTypes>
+QDeferred<RetTypes...> QDeferred<Types...>::thenAlias(
+	const std::function<QDeferred<RetTypes...>(Types(...args))> & doneCallback,
+	const std::function<void()>                                 & failCallback,
+	const Qt::ConnectionType                                    & connection/* = Qt::AutoConnection*/)
 {
 	// check if valid
-	Q_ASSERT_X((std::function<QDeferred<RetTypes...>(Types(...args))>)doneCallback, 
-		       "Deferred then method.", "Invalid done callback as first argument");
+	Q_ASSERT_X(doneCallback, "Deferred then method.", "Invalid done callback as first argument");
 	Q_ASSERT_X(failCallback, "Deferred then method.", "Invalid fail callback as second argument");
 
 	// add fail zero (internal) callback
