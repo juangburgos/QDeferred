@@ -22,7 +22,7 @@ public:
 
 	int       startLoopInThread(const std::function<void()> &threadLoopFunc, const quint32 &uiMsSleep = 1000);
 
-	bool      stopLoopInThread(const int &intLoopId);
+	void      stopLoopInThread(const int &intLoopId);
 
 	void      moveQObjectToThread(QObject * pObject);
 

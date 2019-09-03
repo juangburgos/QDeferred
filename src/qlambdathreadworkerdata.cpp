@@ -106,25 +106,19 @@ int QLambdaThreadWorkerData::startLoopInThread(const std::function<void()> &thre
 	return newLoopId;
 }
 
-bool QLambdaThreadWorkerData::stopLoopInThread(const int &intLoopId)
+// TODO : maybe use QDeferred to return a value for m_mapIdtimerIds.contains
+void QLambdaThreadWorkerData::stopLoopInThread(const int &intLoopId)
 {
-	// check if exists, if not, return false
-	if (!m_mapIdtimerIds.contains(intLoopId))
-	{
-		return false;
-	}
-	// create function to stop loop
-	// serialize map access by using event queue
+	// create function to stop loop, serialize map access by using event queue
 	this->execInThread([this, intLoopId]() {
+		Q_ASSERT_X(m_mapIdtimerIds.contains(intLoopId), "QLambdaThreadWorkerData::stopLoopInThread", "Invalid loop Id.");
 		// get real timer id of timer to stop
 		int timerId = m_mapIdtimerIds.take(intLoopId);
-		// stop timer
-		mp_workerObj->killTimer(timerId);
 		// remove function from map
 		mp_workerObj->m_mapFuncs.remove(timerId);
+		// stop timer
+		mp_workerObj->killTimer(timerId);
 	}, Qt::HighEventPriority);
-	// return success
-	return true;
 }
 
 void QLambdaThreadWorkerData::moveQObjectToThread(QObject * pObject)

@@ -45,9 +45,9 @@ int QLambdaThreadWorker::startLoopInThread(const std::function<void()> &threadLo
 	return m_data->startLoopInThread(threadLoopFunc, uiMsSleep);
 }
 
-bool QLambdaThreadWorker::stopLoopInThread(const int &intLoopId)
+void QLambdaThreadWorker::stopLoopInThread(const int &intLoopId)
 {
-	return m_data->stopLoopInThread(intLoopId);
+	m_data->stopLoopInThread(intLoopId);
 }
 
 void QLambdaThreadWorker::moveQObjectToThread(QObject * pObject)
