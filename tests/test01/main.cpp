@@ -414,8 +414,30 @@ TEST_CASE("Should call then rejected callback after rejected called", "[then][re
 		Q_UNUSED(val);
 		REQUIRE(false);
 	});
-	// reject first
+	// reject after
 	defer1.reject(); // reject here
+}
+
+TEST_CASE("Should call then rejected callback after rejected called. Reject called first.", "[then][reject]")
+{
+	// init
+	QDefer defer1;
+	// reject before
+	defer1.reject(); // reject here
+	// subscribe then callback
+	defer1.then<int>([]() {
+		QDeferred<int> defer2;
+		REQUIRE(false);
+		// return deferred
+		return defer2;
+	}, []() { // fail over 'defer1' with zero arguments
+		// test that gets called
+		REQUIRE(true);
+	}).fail([](int val) {
+		// fail over 'defer2', which is not resolved nor rejected, therefore not called
+		Q_UNUSED(val);
+		REQUIRE(false);
+	});
 }
 
 TEST_CASE("Should call second chained then rejected callback after second rejected called", "[then][reject][chain]")

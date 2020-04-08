@@ -179,6 +179,7 @@ QDeferredData<Types...>::QDeferredData() :
 	m_mutex(QMutex::Recursive)
 {
 	m_state = QDeferredState::PENDING;
+	m_finishedFunction = nullptr;
 }
 
 template<class ...Types>
@@ -220,6 +221,7 @@ void QDeferredData<Types...>::done(const std::function<void(Types(&...args))> &c
 	QMutexLocker locker(&m_mutex);
 	if (m_state == QDeferredState::RESOLVED)
 	{
+		Q_ASSERT(m_finishedFunction);
 		m_finishedFunction(callback);
 	}
 	else
@@ -237,7 +239,13 @@ void QDeferredData<Types...>::fail(const std::function<void(Types(&...args))> &c
 {
 	// call it inmediatly if already rejected
 	QMutexLocker locker(&m_mutex);
-	if (m_state == QDeferredState::REJECTED)
+	// NOTE : m_finishedFunction can be nullptr here if m_state was set to QDeferredState::RESOLVED
+	//        due to call to ::rejectZero before ::resolve or ::reject are called, in which case 
+	//        this callback should not be called, since there are not arguments to call it.
+	//        This condition happens, for example, when a new deferred object is returned by 'then'
+	//        method of another deferred that has been already rejected and this new deferred object 
+	//        subscribes a fail callback. Thats how we arrive here with a m_finishedFunction == nullptr
+	if (m_finishedFunction && m_state == QDeferredState::REJECTED)
 	{
 		m_finishedFunction(callback);
 	}
@@ -294,6 +302,7 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 			// execute according to connection type
 			if (currConnection == Qt::DirectConnection || (currConnection == Qt::AutoConnection && p_currThread == QThread::currentThread()))
 			{
+				Q_ASSERT(m_finishedFunction);
 				// call directly with arguments
 				m_finishedFunction(currCallback);
 			}
@@ -302,6 +311,7 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 				// create object in heap and assign function (event loop takes ownership and deletes it later)
 				QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
 				p_Evt->m_eventFunc = [ref, this, currCallback]() mutable {
+					Q_ASSERT(m_finishedFunction);
 					// call in thread with arguments
 					m_finishedFunction(currCallback);
 					// unused, but we need it to keep at least one reference until all callbacks are executed
@@ -390,6 +400,7 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 			// execute according to connection type
 			if (currConnection == Qt::DirectConnection || (currConnection == Qt::AutoConnection && p_currThread == QThread::currentThread()))
 			{
+				Q_ASSERT(m_finishedFunction);
 				// call directly with arguments
 				m_finishedFunction(currCallback);
 			}
@@ -398,6 +409,7 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 				// create object in heap and assign function (event loop takes ownership and deletes it later)
 				QDeferredProxyEvent * p_Evt = new QDeferredProxyEvent;
 				p_Evt->m_eventFunc = [ref, this, currCallback]() mutable {
+					Q_ASSERT(m_finishedFunction);
 					// call in thread with arguments
 					m_finishedFunction(currCallback);
 					// unused, but we need it to keep at least one reference until all callbacks are executed
