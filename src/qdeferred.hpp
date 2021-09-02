@@ -70,6 +70,11 @@ public:
 	template <class ...OtherTypes, typename... Rest>
 	static QDeferred<> when(QDeferred<OtherTypes...> t, Rest... rest);
 
+	// can pass a cointainer (implementing begin/end iterator and ::size()) 
+	// instead of passing variadic arguments one by one
+	template<template<class> class Container, class ...OtherTypes>
+	static QDeferred<> when(const Container<QDeferred<OtherTypes...>>& deferList);
+
 	// wrapper provider API
 
 	// resolve method
@@ -343,12 +348,13 @@ template<class ...Types>
 template<class ...OtherTypes, class... Rest>
 QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest)
 {
-	// setup necessary variables for expansion
 	QDefer retDeferred;
+	// setup necessary variables for expansion
 	int    countArgs = sizeof...(Rest) + 1;
 	// done callback, resolve if ALL done
 	auto doneCallback = [retDeferred, countArgs]() mutable {
-		retDeferred.setWhenCount(retDeferred.getWhenCount() + 1); // whenCount++
+		// whenCount++
+		retDeferred.setWhenCount(retDeferred.getWhenCount() + 1);
 		int whenCount = retDeferred.getWhenCount();
 		if (whenCount == countArgs)
 		{
@@ -361,6 +367,33 @@ QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest)
 	};
 	// expand
 	QDeferredDataBase::whenInternal(doneCallback, failCallback, t, rest...);
+	// return deferred
+	return retDeferred;
+}
+
+template<class ...Types>
+template<template<class> class Container, class ...OtherTypes>
+QDefer QDeferred<Types...>::when(const Container<QDeferred<OtherTypes...>>& deferList)
+{
+	QDefer retDeferred;
+	// setup necessary variables for expansion
+	int count = deferList.size();
+	// done callback, resolve if ALL done
+	auto doneCallback = [retDeferred, count]() mutable {
+		// whenCount++
+		retDeferred.setWhenCount(retDeferred.getWhenCount() + 1);
+		int whenCount = retDeferred.getWhenCount();
+		if (whenCount == count)
+		{
+			retDeferred.resolve();
+		}
+	};
+	// fail callback, reject if ONE fails
+	auto failCallback = [retDeferred]() mutable {
+		retDeferred.reject();
+	};
+	// call in friend class to access private methods
+	QDeferredDataBase::whenInternal(doneCallback, failCallback, deferList);	
 	// return deferred
 	return retDeferred;
 }

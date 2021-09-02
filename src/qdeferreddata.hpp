@@ -68,6 +68,20 @@ protected:
 		whenInternal(doneCallback, failCallback, rest...);
 	}
 
+	//template<class ...OtherTypes>
+	template<template<class> class Container, class ...OtherTypes>
+	static void whenInternal(std::function<void()> doneCallback, std::function<void()> failCallback, const Container<QDeferred<OtherTypes...>>& deferList)
+	{
+		// expand
+		for (auto defer : deferList)
+		{
+			// add to done zero params list
+			defer.doneZero(doneCallback);
+			// add to fail zero params list
+			defer.failZero(failCallback);
+		}
+	}
+
 	static QObject s_objExitCleaner;
 
 	static QDeferredProxyObject * getObjectForThread(QThread * p_currThd);
@@ -241,7 +255,7 @@ void QDeferredData<Types...>::fail(const std::function<void(Types(&...args))> &c
 	QMutexLocker locker(&m_mutex);
 	// NOTE : m_finishedFunction can be nullptr here if m_state was set to QDeferredState::RESOLVED
 	//        due to call to ::rejectZero before ::resolve or ::reject are called, in which case 
-	//        this callback should not be called, since there are not arguments to call it.
+	//        this callback should not be called, since there are no arguments to call it.
 	//        This condition happens, for example, when a new deferred object is returned by 'then'
 	//        method of another deferred that has been already rejected and this new deferred object 
 	//        subscribes a fail callback. Thats how we arrive here with a m_finishedFunction == nullptr
