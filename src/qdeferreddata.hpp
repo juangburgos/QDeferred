@@ -155,6 +155,8 @@ public:
 
 	// when memory
 	int m_whenCount = 0;
+	// blocking event loop
+	QEventLoop* m_blockingEventLoop;
 
 private:
 	// struct to store callback data
@@ -183,17 +185,19 @@ private:
 	QMap< QThread *, DeferredAllCallbacks * > m_callbacksMap;
 	QDeferredState m_state;
 	QMutex         m_mutex;
-	QList<QMetaObject::Connection> m_connectionList;
+	QList<QMetaObject::Connection> m_connectionList;	
 	// methods
-	DeferredAllCallbacks * getCallbaksForThread();
+	DeferredAllCallbacks * getCallbacksForThread();
 };
 
 template<class ...Types>
 QDeferredData<Types...>::QDeferredData() :
-	m_mutex(QMutex::Recursive)
+	m_mutex(QMutex::Recursive),
+	m_state(QDeferredState::PENDING),
+	m_finishedFunction(nullptr),
+	m_blockingEventLoop(nullptr)
 {
-	m_state = QDeferredState::PENDING;
-	m_finishedFunction = nullptr;
+	
 }
 
 template<class ...Types>
@@ -216,7 +220,8 @@ m_callbacksMap(other.m_callbacksMap),
 m_state(other.m_state),
 m_mutex(other.m_mutex),
 m_connectionList(other.m_connectionList),
-m_finishedFunction(other.m_finishedFunction)
+m_finishedFunction(other.m_finishedFunction),
+m_blockingEventLoop(other.m_blockingEventLoop)
 {
 	// nothing to do here
 }
@@ -241,7 +246,7 @@ void QDeferredData<Types...>::done(const std::function<void(Types(&...args))> &c
 	else
 	{
 		// add object for thread if does not exists
-		auto p_callbacks = this->getCallbaksForThread();
+		auto p_callbacks = this->getCallbacksForThread();
 		// append to done callbacks list
 		p_callbacks->m_doneList.append({ callback, connection });
 	}
@@ -266,7 +271,7 @@ void QDeferredData<Types...>::fail(const std::function<void(Types(&...args))> &c
 	else
 	{
 		// add object for thread if does not exists
-		auto p_callbacks = this->getCallbaksForThread();
+		auto p_callbacks = this->getCallbacksForThread();
 		// append to fail callbacks list
 		p_callbacks->m_failList.append({ callback, connection });
 	}
@@ -277,7 +282,7 @@ void QDeferredData<Types...>::progress(const std::function<void(Types(&...args))
 	                                   const Qt::ConnectionType &connection/* = Qt::AutoConnection*/)
 {
 	// add object for thread if does not exists
-	auto p_callbacks = this->getCallbaksForThread();
+	auto p_callbacks = this->getCallbacksForThread();
 	// append to progress callbacks list
 	p_callbacks->m_progressList.append({ callback, connection });
 }
@@ -298,6 +303,11 @@ void QDeferredData<Types...>::resolve(QDeferred<Types...> ref, Types(&...args))
 	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after resolve)
 	m_finishedFunction = std::bind(GCC_DEF_FIX::finishedFunctionTemplate<Types...>, std::placeholders::_1, args...);
 
+	// unblock blocking event loop if any
+	if (m_blockingEventLoop)
+	{
+		m_blockingEventLoop->quit();
+	}
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
 	while (i.hasNext()) 
@@ -396,6 +406,11 @@ void QDeferredData<Types...>::reject(QDeferred<Types...> ref, Types(&...args))
 	// set finished function (used to cache variadic args as a copy to be able to exec funcs added after reject)
 	m_finishedFunction = std::bind(GCC_DEF_FIX::finishedFunctionTemplate<Types...>, std::placeholders::_1, args...);
 
+	// unblock blocking event loop if any
+	if (m_blockingEventLoop)
+	{
+		m_blockingEventLoop->quit();
+	}
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
 	while (i.hasNext()) 
@@ -492,6 +507,11 @@ void QDeferredData<Types...>::rejectZero(QDeferred<Types...> ref)
 	// change state
 	m_state = QDeferredState::REJECTED;
 
+	// unblock blocking event loop if any
+	if (m_blockingEventLoop)
+	{
+		m_blockingEventLoop->quit();
+	}
 	// for each thread where there are callbacks to be called
 	QMapIterator< QThread *, DeferredAllCallbacks *> i(m_callbacksMap);
 	while (i.hasNext())
@@ -610,7 +630,7 @@ void QDeferredData<Types...>::doneZero(const std::function<void()> &callback,
 	else
 	{
 		// add object for thread if does not exists
-		auto p_callbacks = this->getCallbaksForThread();
+		auto p_callbacks = this->getCallbacksForThread();
 		// append to done zero callbacks list
 		p_callbacks->m_doneZeroList.append({ callback, connection });
 	}
@@ -629,7 +649,7 @@ void QDeferredData<Types...>::failZero(const std::function<void()> &callback,
 	else
 	{
 		// add object for thread if does not exists
-		auto p_callbacks = this->getCallbaksForThread();
+		auto p_callbacks = this->getCallbacksForThread();
 		// append to fail zero callbacks list
 		p_callbacks->m_failZeroList.append({ callback, connection });
 	}
@@ -637,7 +657,7 @@ void QDeferredData<Types...>::failZero(const std::function<void()> &callback,
 
 // https://stackoverflow.com/questions/13559756/declaring-a-struct-in-a-template-class-undefined-for-member-functions
 template<class ...Types>
-typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>::getCallbaksForThread()
+typename QDeferredData<Types...>::DeferredAllCallbacks * QDeferredData<Types...>::getCallbacksForThread()
 {
 	QMutexLocker locker(&m_mutex);
 	// get current thread

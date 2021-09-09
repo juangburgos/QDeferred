@@ -70,10 +70,24 @@ public:
 	template <class ...OtherTypes, typename... Rest>
 	static QDeferred<> when(QDeferred<OtherTypes...> t, Rest... rest);
 
-	// can pass a cointainer (implementing begin/end iterator and ::size()) 
+	// can pass a container (implementing begin/end iterator and ::size()) 
 	// instead of passing variadic arguments one by one
 	template<template<class> class Container, class ...OtherTypes>
 	static QDeferred<> when(const Container<QDeferred<OtherTypes...>>& deferList);
+
+	// block current thread until deferred object gets resolved/rejected
+	// NOTE : since current thread is blocked, the deferred object must be
+	//        resolved/rejected in a different thread
+	template<class ...OtherTypes>
+	static bool waitBlocking(const QDeferred<OtherTypes...>& defer);
+
+	// syntactic sugar for multiple deferred objects
+	template <class ...OtherTypes, typename... Rest>
+	static bool waitBlocking(QDeferred<OtherTypes...> t, Rest... rest);
+
+	// syntactic sugar for container of deferred objects
+	template<template<class> class Container, class ...OtherTypes>
+	static bool waitBlocking(const Container<QDeferred<OtherTypes...>>& deferList);
 
 	// wrapper provider API
 
@@ -396,6 +410,33 @@ QDefer QDeferred<Types...>::when(const Container<QDeferred<OtherTypes...>>& defe
 	QDeferredDataBase::whenInternal(doneCallback, failCallback, deferList);	
 	// return deferred
 	return retDeferred;
+}
+
+template<class ...Types>
+template<class ...OtherTypes>
+bool QDeferred<Types...>::waitBlocking(const QDeferred<OtherTypes...>& defer)
+{
+	QEventLoop blockingEventLoop;
+	// pass loop reference so it can be un-blocked in resolving/rejecting thread
+	defer.m_data->m_blockingEventLoop = &blockingEventLoop;
+	// block until resolved/rejected
+	blockingEventLoop.exec();
+	// return whether resolved or rejected
+	return defer.state() == QDeferredState::RESOLVED;
+}
+
+template<class ...Types>
+template<class ...OtherTypes, typename ...Rest>
+bool QDeferred<Types...>::waitBlocking(QDeferred<OtherTypes...> t, Rest ...rest)
+{
+	return QDefer::waitBlocking(QDefer::when(t, rest...));
+}
+
+template<class ...Types>
+template<template<class> class Container, class ...OtherTypes>
+ bool QDeferred<Types...>::waitBlocking(const Container<QDeferred<OtherTypes...>>& deferList)
+{
+	return QDefer::waitBlocking(QDefer::when(deferList));
 }
 
 template<class ...Types>

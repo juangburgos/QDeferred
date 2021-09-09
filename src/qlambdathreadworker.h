@@ -14,7 +14,7 @@ public:
 	QLambdaThreadWorker &operator=(const QLambdaThreadWorker &rhs);
 	~QLambdaThreadWorker();
 
-	void      execInThread(const std::function<void()> &threadFunc, const Qt::EventPriority &priority = Qt::NormalEventPriority);
+	bool      execInThread(const std::function<void()> &threadFunc, const Qt::EventPriority &priority = Qt::NormalEventPriority);
 
 	QString   getThreadId();
 
@@ -22,9 +22,13 @@ public:
 
 	int       startLoopInThread(const std::function<void()> &threadLoopFunc, const quint32 &uiMsSleep = 1000);
 
-	void      stopLoopInThread(const int &intLoopId);
+	QDefer    stopLoopInThread(const int &intLoopId);
 
-	void      moveQObjectToThread(QObject * pObject);
+	QDefer    stopAllLoopsInThread();
+
+	bool      moveQObjectToThread(QObject * pObject);
+
+	QDefer    quitThread();
 
 protected:
 	QExplicitlySharedDataPointer<QLambdaThreadWorkerData> m_data;

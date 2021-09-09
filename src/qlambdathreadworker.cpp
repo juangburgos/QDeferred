@@ -25,9 +25,9 @@ QLambdaThreadWorker::~QLambdaThreadWorker()
 	m_data.reset();
 }
 
-void QLambdaThreadWorker::execInThread(const std::function<void()> &threadFunc, const Qt::EventPriority &priority/* = Qt::NormalEventPriority*/)
+bool QLambdaThreadWorker::execInThread(const std::function<void()> &threadFunc, const Qt::EventPriority &priority/* = Qt::NormalEventPriority*/)
 {
-	m_data->execInThread(threadFunc, priority);
+	return m_data->execInThread(threadFunc, priority);
 }
 
 QString QLambdaThreadWorker::getThreadId()
@@ -45,12 +45,22 @@ int QLambdaThreadWorker::startLoopInThread(const std::function<void()> &threadLo
 	return m_data->startLoopInThread(threadLoopFunc, uiMsSleep);
 }
 
-void QLambdaThreadWorker::stopLoopInThread(const int &intLoopId)
+QDefer QLambdaThreadWorker::stopLoopInThread(const int &intLoopId)
 {
-	m_data->stopLoopInThread(intLoopId);
+	return m_data->stopLoopInThread(intLoopId);
 }
 
-void QLambdaThreadWorker::moveQObjectToThread(QObject * pObject)
+QDefer QLambdaThreadWorker::stopAllLoopsInThread()
 {
-	m_data->moveQObjectToThread(pObject);
+	return m_data->stopAllLoopsInThread();
+}
+
+bool QLambdaThreadWorker::moveQObjectToThread(QObject * pObject)
+{
+	return m_data->moveQObjectToThread(pObject);
+}
+
+QDefer QLambdaThreadWorker::quitThread()
+{
+	return m_data->quitThread();
 }
