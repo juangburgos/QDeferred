@@ -164,9 +164,9 @@ QDefer QLambdaThreadWorkerData::stopLoopInThread(const int &intLoopId)
 	}
 	// create function to stop loop, serialize map access by using event queue
 	this->execInThread([this, intLoopId, retDefer]() mutable {
-		Q_ASSERT_X(m_mapIdtimerIds.contains(intLoopId), "QLambdaThreadWorkerData::stopLoopInThread", "Invalid loop Id.");
 		if (!m_mapIdtimerIds.contains(intLoopId))
 		{
+			qWarning() << "QLambdaThreadWorker::stopLoopInThread : Invalid loop Id.";
 			retDefer.reject();
 			return;
 		}

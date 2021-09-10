@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 
 	stopper.fail([p_counter, worker, intLoopId]() mutable {
 		worker.stopLoopInThread(intLoopId);
-		qDebug() << "[INFO] Stop result " << worker.stopLoopInThread(intLoopId);
+		qDebug() << "[INFO] Stop result " << QDefer::waitBlocking(worker.stopLoopInThread(intLoopId));
 		qDebug() << "[THREAD:STOPFROM] Id " << QThread::currentThread();
 		delete p_counter;
 	});

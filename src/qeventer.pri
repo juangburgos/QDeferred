@@ -1,4 +1,4 @@
-include(./qdynamicevents.pri)
+include($$PWD/qdynamicevents.pri)
 
 HEADERS  += $$PWD/qeventer.h \
 
