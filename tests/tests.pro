@@ -15,3 +15,4 @@ SUBDIRS = \
 ./test10/test10.pro \
 ./test11/test11.pro \
 ./test12/test12.pro \
+./test13/test13.pro \
