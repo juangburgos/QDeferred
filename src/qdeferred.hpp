@@ -3,6 +3,7 @@
 
 #include <QExplicitlySharedDataPointer>
 #include <QList>
+#include <QTimer>
 #include <functional>
 #include <QDebug>
 
@@ -431,6 +432,32 @@ bool QDeferred<Types...>::awaitInternal(const QDeferred<>& defer)
 	QEventLoop blockingEventLoop;
 	// pass loop reference so it can be un-blocked in resolving/rejecting thread
 	defer.m_data->m_blockingEventLoop = &blockingEventLoop;
+	// handle case where thread gets stopped or deleted
+	QThread* currThread = QThread::currentThread();
+	QObject::connect(currThread, &QThread::finished, &blockingEventLoop, 
+	[&blockingEventLoop]() {
+		if (blockingEventLoop.isRunning())
+		{
+			blockingEventLoop.quit();
+		}
+	});
+	QObject::connect(currThread, &QThread::destroyed, &blockingEventLoop, 
+	[&blockingEventLoop]() {
+		if (blockingEventLoop.isRunning())
+		{
+			blockingEventLoop.quit();
+		}
+	});
+	// sometimes it is already resolved by the time we reach here
+	if (defer.state() != QDeferredState::PENDING)
+	{
+		QTimer::singleShot(0, &blockingEventLoop, [&blockingEventLoop]() {
+			if (blockingEventLoop.isRunning())
+			{
+				blockingEventLoop.quit();
+			}
+		});
+	}
 	// block until resolved/rejected
 	blockingEventLoop.exec();
 	// return whether resolved or rejected
