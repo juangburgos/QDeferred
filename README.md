@@ -1002,6 +1002,6 @@ And finally remember to make sure that any lamba captures made by reference live
 
 ## License
 
-LICENSE is MIT.
+[LICENSE is MIT.](./LICENSE)
 
-Copyright (c) 2017-2019 Juan Gonzalez Burgos
+Copyright (c) 2017-Forever Juan Gonzalez Burgos
