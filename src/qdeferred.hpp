@@ -377,6 +377,11 @@ QDefer QDeferred<Types...>::when(QDeferred<OtherTypes...> t, Rest... rest)
 	};
 	// fail callback, reject if ONE fails
 	auto failCallback = [retDeferred]() mutable {
+		// can only reject once
+		if (retDeferred.state() != QDeferredState::PENDING)
+		{
+			return;
+		}
 		retDeferred.reject();
 	};
 	// expand
@@ -404,6 +409,11 @@ QDefer QDeferred<Types...>::when(const Container<QDeferred<OtherTypes...>>& defe
 	};
 	// fail callback, reject if ONE fails
 	auto failCallback = [retDeferred]() mutable {
+		// can only reject once
+		if (retDeferred.state() != QDeferredState::PENDING)
+		{
+			return;
+		}
 		retDeferred.reject();
 	};
 	// call in friend class to access private methods
