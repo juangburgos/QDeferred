@@ -86,8 +86,8 @@ QLambdaThreadWorkerData::QLambdaThreadWorkerData()
 
 QLambdaThreadWorkerData::QLambdaThreadWorkerData(const QLambdaThreadWorkerData &other) : 
 	QSharedData(other),
-	mp_workerObj   (other.mp_workerObj   ),
 	mp_workerThread(other.mp_workerThread),
+	mp_workerObj   (other.mp_workerObj   ),
 	m_strThreadId  (other.m_strThreadId  ),
 	m_intIdCounter (other.m_intIdCounter ),
 	m_requestedQuit(other.m_requestedQuit)
