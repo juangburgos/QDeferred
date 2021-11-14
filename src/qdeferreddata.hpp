@@ -192,9 +192,9 @@ private:
 
 template<class ...Types>
 QDeferredData<Types...>::QDeferredData() :
-	m_mutex(QMutex::Recursive),
+	m_blockingEventLoop(nullptr),
 	m_state(QDeferredState::PENDING),
-	m_blockingEventLoop(nullptr)
+	m_mutex(QMutex::Recursive)
 {
 	// NOTE : compiling below or in init list m_finishedFunction(nullptr)
 	//        randomly fails to compile
