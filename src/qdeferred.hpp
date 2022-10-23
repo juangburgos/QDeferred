@@ -202,7 +202,7 @@ QDeferred<RetTypes...> QDeferred<Types...>::then(
 	const T                  &doneCallback,
 	const Qt::ConnectionType &connection/* = Qt::AutoConnection*/)
 {
-	return this->thenAlias<RetTypes...>((std::function<QDeferred<RetTypes...>(Types(...args))>)doneCallback, connection);
+	return this->thenAlias<RetTypes...>((std::function<QDeferred<RetTypes...>(Types...)>)doneCallback, connection);
 }
 
 template<class ...Types>
@@ -226,23 +226,26 @@ QDeferred<RetTypes...> QDeferred<Types...>::thenAlias(
 	// create deferred to return
 	QDeferred<RetTypes...> retPromise;
 
-	// add intermediate done nameless callback
-	m_data->done([doneCallback, retPromise](Types(...args1)) mutable {
+	std::function<void(Types...)> intermediateDoneCallback = 
+	[doneCallback, retPromise](Types... args1) mutable {
 		// when done execute user callback, then when user deferred and when done...
 		doneCallback(args1...)
-			.done([retPromise](RetTypes(...args2)) mutable {
+		.done([retPromise](RetTypes... args2) mutable {
 			// resolve returned deferred
 			retPromise.resolve(args2...);
 		})
-			.fail([retPromise](RetTypes(...args2)) mutable {
+		.fail([retPromise](RetTypes... args2) mutable {
 			// reject returned deferred
 			retPromise.reject(args2...);
 		})
-			.progress([retPromise](RetTypes(...args2)) mutable {
+		.progress([retPromise](RetTypes... args2) mutable {
 			// notify returned deferred
 			retPromise.notify(args2...);
 		});
-	}, connection);
+	};
+
+	// add intermediate done nameless callback
+	m_data->done(intermediateDoneCallback, connection);
 
 	// allow propagation
 	m_data->failZero([retPromise]() mutable {
@@ -261,7 +264,7 @@ QDeferred<RetTypes...> QDeferred<Types...>::then(
 	const std::function<void()> &failCallback,
 	const Qt::ConnectionType    &connection/* = Qt::AutoConnection*/)
 {
-	return this->thenAlias<RetTypes...>((std::function<QDeferred<RetTypes...>(Types(...args))>)doneCallback, failCallback, connection);
+	return this->thenAlias<RetTypes...>((std::function<QDeferred<RetTypes...>(Types...)>)doneCallback, failCallback, connection);
 }
 
 template<class ...Types>
